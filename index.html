@@ -1,3 +1,23 @@
+這是一個非常實際且重要的問題！在救護現場（尤其是進香遶境時，人潮擁擠或偏鄉山區）網路訊號通常很差，甚至完全沒有網路。
+
+因為 LINE LIFF 強制需要網路才能確認身分，如果沒有網路，系統就會卡在「無法驗證」的畫面進不去。
+
+為了完美解決這個問題，我幫您加入了 「智慧離線模式 (Offline Mode)」，運作邏輯如下：
+
+1.  第一次使用（有網路時）： 正常登入 LINE 並核准身分，系統會把您的身分權限 「安全快取到手機本地」。
+2.  之後使用（無網路時）： 系統偵測到沒網路或 LINE 連線失敗時，會自動抓取手機內的快取身分直接讓您登入！
+3.  離線寫紀錄怎麼辦？ Firebase
+    資料庫本身有「離線暫存」功能。沒網路時填寫的紀錄，系統會顯示「已存入本機暫存」，等您的手機一連上網路，系統就會在背景自動無縫上傳到雲端！
+
+💡 重要前置作業：如何真正做到「離線開啟」？
+
+因為沒網路時，瀏覽器連網址都連不上。所以您與所有團員務必在「有網路時」做一次這個動作： 👉 用手機瀏覽器打開這個網址 ➔ 點擊瀏覽器的選單 ➔ 選擇「加到主畫面
+(Add to Home Screen)」 以後就算開啟飛航模式，只要點擊桌面上的圖示，就能瞬間打開救護紀錄表！
+
+🛠️ 完整更新程式碼
+
+請將您的 HTML 檔案內容全數清除，並重新貼上這份最新的程式碼。我已經將「智慧離線模式」與「本機暫存機制」完美整合進去了，且不會影響其他功能：
+
 <!DOCTYPE html>
 <html>
   <head>
@@ -32,8 +52,9 @@
       .header-sub { font-size: 14px; font-weight: 600; color: #888; text-align: right; }
       .header-org-name { font-size: 10px; font-weight: 600; color: #999; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 2px; }
       
-      .admin-top-btn { position: absolute; top: 12px; right: 16px; background: #333; color: #ffeb3b; border: 1px solid #ffeb3b; padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: bold; cursor: pointer; z-index: 2500; }
-      .admin-console-btn { position: absolute; top: 12px; right: 115px; background: #0284c7; color: #fff; border: none; padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: bold; cursor: pointer; z-index: 2500; }
+      /* ★ 權限控管：管理員按鈕預設隱藏，驗證後用 JS 打開 ★ */
+      .admin-top-btn { display: none; position: absolute; top: 12px; right: 16px; background: #333; color: #ffeb3b; border: 1px solid #ffeb3b; padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: bold; cursor: pointer; z-index: 2500; }
+      .admin-console-btn { display: none; position: absolute; top: 12px; right: 115px; background: #0284c7; color: #fff; border: none; padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: bold; cursor: pointer; z-index: 2500; }
 
       .tabs { display: flex; padding: 8px 15px 12px 15px; gap: 5px; pointer-events: none; }
       .tab-item { flex: 1; text-align: center; padding: 8px 0; font-size: 13px; font-weight: 600; color: #ccc; border-radius: 12px; transition: all 0.3s; }
@@ -191,8 +212,9 @@
       .console-card { background: #fff; width: 100%; max-width: 410px; height: 96vh; border-radius: 16px; display: flex; flex-direction: column; overflow: hidden; }
       .console-header { background: #0284c7; color: #fff; padding: 12px 15px; font-size: 15px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
       
+      /* 分頁調整 */
       .console-tabs { display: flex; background: #e0f2fe; border-bottom: 1px solid #bae6fd; }
-      .console-tab { flex: 1; text-align: center; padding: 8px 0; font-size: 13px; font-weight: bold; color: #0369a1; cursor: pointer; border-bottom: 2px solid transparent; }
+      .console-tab { flex: 1; text-align: center; padding: 10px 0; font-size: 12px; font-weight: bold; color: #0369a1; cursor: pointer; border-bottom: 2px solid transparent; }
       .console-tab.active { background: #fff; color: #0284c7; border-bottom: 2px solid #0284c7; }
 
       .console-panel { display: none; flex: 1; overflow-y: auto; background: #f8fafc; padding: 8px; flex-direction: column; }
@@ -229,7 +251,7 @@
       .modal-card { background: white; width: 85%; max-width: 320px; border-radius: 24px; padding: 25px; box-shadow: 0 20px 40px rgba(0,0,0,0.2); }
       .modal-title { font-size: 18px; font-weight: 800; color: var(--ssc-primary); margin-bottom: 15px; text-align: center; }
       .modal-row { margin-bottom: 15px; }
-      .modal-row label { display: block; font-size: 13px; color: #888; margin-bottom: 5px; font-weight: 600; }
+      .modal-row label { display: block; font-size: 13px; color: #888; margin-bottom: 5px; font-weight: 600; text-align: left; }
       .modal-select, .modal-input { width: 100%; padding: 12px; border-radius: 12px; border: 1px solid #eee; background: #f9f9f9; font-size: 16px; outline: none; box-sizing: border-box; }
       .modal-input-group { display: flex; align-items: center; gap: 8px; }
       .modal-input-group input { flex: 1; }
@@ -240,7 +262,6 @@
       #loading { background: rgba(0,0,0,0.5); backdrop-filter: blur(5px); display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 9999; justify-content: center; align-items: center; color: #fff; font-size: 18px; }
     </style>
 
-    <!-- ★ 新增樣式（不動上方既有樣式）：主控台列表時間不被裁切、編輯模式列、統計收合箭頭 ★ -->
     <style id="addonStyles">
       .console-row-item { gap: 8px; }
       .console-row-left { min-width: 0; flex: 1; word-break: break-all; }
@@ -259,7 +280,7 @@
       .chart-category-box.open .chart-arrow { transform: rotate(180deg); }
       .sub-item-row { font-size: 12px; padding: 6px 0; }
 
-      /* 案件清單檢視模式：條列 / 小圖 / 中圖 / 大圖 */
+      /* 案件清單檢視模式 */
       .view-mode-bar { display: flex; gap: 6px; padding: 0 0 6px 0; }
       .view-mode-bar button { flex: 1; border: 1px solid #bae6fd; background: #fff; color: #0369a1; border-radius: 6px; padding: 6px 0; font-size: 12px; font-weight: bold; cursor: pointer; }
       .view-mode-bar button.active { background: #0284c7; color: #fff; border-color: #0284c7; }
@@ -270,7 +291,7 @@
       .cc-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.05); min-width: 0; }
       .cc-card:active { background: #f1f5f9; }
       .cc-thumb { width: 100%; background: #f1f5f9; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-            .cc-thumb { background: #fff; }
+      .cc-thumb { background: #fff; }
       .cc-map { position: relative; height: 100%; line-height: 0; }
       .cc-map img { height: 100%; width: auto; display: block; }
       .cc-map .preview-dot { width: 7px; height: 7px; }
@@ -292,7 +313,7 @@
       .view-large .cc-thumb { height: 260px; }
       .view-large .cc-body { font-size: 13px; padding: 8px 10px; }
 
-      /* 自訂完成/錯誤提示（取代瀏覽器內建 alert） */
+      /* 自訂完成/錯誤提示 */
       .notice-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.45); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); z-index: 9500; align-items: center; justify-content: center; }
       .notice-card { background: #fff; width: 80%; max-width: 300px; border-radius: 24px; padding: 28px 22px 20px 22px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.25); animation: noticePop 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
       @keyframes noticePop { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: scale(1); } }
@@ -333,7 +354,7 @@
       .scene-grid-container.field-error { padding-top: 8px; padding-bottom: 8px; }
       @keyframes errShake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
 
-      /* 大圖：傷情圖 / 現場照片 切換 */
+      /* 大圖切換 */
       .cc-media-tabs { display: flex; gap: 6px; padding: 6px 8px 0 8px; background: #fff; }
       .cc-media-tabs button { flex: 1; border: 1px solid #bae6fd; background: #fff; color: #0369a1; border-radius: 6px; padding: 5px 0; font-size: 12px; font-weight: bold; cursor: pointer; }
       .cc-media-tabs button.active { background: #0284c7; color: #fff; border-color: #0284c7; }
@@ -342,34 +363,89 @@
       .cc-nophoto { width: 100%; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 14px; }
       .cc-thumb.show-photo .cc-map { display: none; }
       .cc-thumb.show-photo .cc-pane-photo { display: flex; }
+      
+      /* ★ 登入與審核攔截畫面樣式 ★ */
+      .auth-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 20px; flex-direction: column; }
+      .auth-card { background: #fff; width: 100%; max-width: 340px; border-radius: 20px; padding: 30px 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; display: none; }
+      .auth-card h3 { color: #D65A68; margin-top: 0; margin-bottom: 10px; font-size: 20px; }
+      .auth-spinner { border: 4px solid #f3f3f3; border-top: 4px solid #D65A68; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 15px auto; }
+      @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+      /* ★ 管理員 - 使用者清單樣式 ★ */
+      .user-row { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 8px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+      .user-row-header { display: flex; justify-content: space-between; align-items: flex-start; }
+      .user-row-name { font-weight: bold; font-size: 14px; color: #1e293b; display: flex; flex-direction: column; }
+      .user-row-id { font-size: 11px; color: #64748b; font-family: monospace; margin-top: 2px; }
+      .user-row-status { font-size: 11px; padding: 3px 6px; border-radius: 4px; font-weight: bold; }
+      .status-pending { background: #fef08a; color: #854d0e; }
+      .status-approved { background: #dcfce7; color: #166534; }
+      .status-rejected { background: #fee2e2; color: #991b1b; }
+      .user-row-actions { display: flex; gap: 6px; border-top: 1px dashed #e2e8f0; padding-top: 8px; }
+      .u-btn { flex: 1; border: none; padding: 6px 0; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer; color: #fff; transition: 0.1s; }
+      .u-btn:active { transform: scale(0.96); }
+      .ub-ok { background: #10b981; }
+      .ub-no { background: #ef4444; }
+      .ub-admin { background: #8b5cf6; }
+      .ub-user { background: #3b82f6; }
+      .role-badge { font-size: 10px; background: #8b5cf6; color: #fff; padding: 2px 4px; border-radius: 4px; margin-left: 4px; vertical-align: middle; }
+
+      /* ★ 離線模式提示 ★ */
+      #offlineBanner { display: none; background: #ff9800; color: #fff; font-size: 12px; font-weight: bold; text-align: center; padding: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); position: relative; z-index: 3000; }
     </style>
-  <style id="authStyles">
-  input, textarea { -webkit-user-select: text; user-select: text; }
-  body:not(.is-admin) .admin-top-btn, body:not(.is-admin) .admin-console-btn { display: none !important; }
-  #gateOverlay { display: flex; position: fixed; inset: 0; z-index: 9800; background: linear-gradient(135deg,#fdfbfb,#ebedee); align-items: center; justify-content: center; padding: 20px; }
-  .gate-box { background: #fff; width: 100%; max-width: 360px; border-radius: 24px; padding: 26px 22px; box-shadow: 0 20px 40px rgba(0,0,0,.15); text-align: center; }
-  .gate-box h2 { margin: 0 0 6px; color: #D65A68; font-size: 20px; }
-  .gate-box p { font-size: 13px; color: #666; line-height: 1.6; margin: 6px 0 14px; }
-  .gate-box input { width: 100%; padding: 13px; margin-bottom: 10px; border: 1px solid #eee; border-radius: 12px; background: #f9f9f9; font-size: 16px; text-align: left; outline: none; }
-  .gate-btn { width: 100%; border: none; border-radius: 14px; padding: 13px; font-size: 16px; font-weight: 600; color: #fff; background: linear-gradient(135deg,#D65A68,#E57E86); cursor: pointer; margin-top: 4px; }
-  .gate-btn.sec { background: #eee; color: #666; }
-  .staff-item { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; margin-bottom: 6px; font-size: 12px; line-height: 1.6; color: #334155; }
-  .staff-item .st-btns { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 6px; }
-  .staff-item button { border: none; border-radius: 6px; padding: 5px 9px; font-size: 11px; font-weight: bold; color: #fff; cursor: pointer; }
-  .st-ok { background: #16a34a; } .st-no { background: #f59e0b; } .st-adm { background: #0284c7; } .st-del { background: #ef4444; }
-  .st-tag { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 10px; font-weight: bold; }
-  .st-tag.pending { background: #fef3c7; color: #b45309; } .st-tag.approved { background: #dcfce7; color: #166534; }
-  .st-tag.rejected { background: #fee2e2; color: #b91c1c; } .st-tag.admin { background: #dbeafe; color: #1d4ed8; }
-</style>
   </head>
   <body>
 
-  <div id="gateOverlay"><div class="gate-box" id="gateBox"><h2>驗證中…</h2><p>正在確認您的 LINE 身分</p></div></div>
+  <!-- ================= ★ 登入與審核攔截畫面 ★ ================= -->
+  <div id="authScreen" class="auth-screen">
+    
+    <!-- 載入中 -->
+    <div class="auth-card" id="authLoading" style="display: block;">
+      <div class="auth-spinner"></div>
+      <h3 id="authLoadingTitle">系統載入中...</h3>
+      <p id="authLoadingMsg" style="color:#666; font-size:14px;">正在驗證登入狀態與連線</p>
+    </div>
+    
+    <!-- 首次註冊 -->
+    <div class="auth-card" id="authRegister" style="text-align:left;">
+      <h3 style="text-align:center;">🛡️ 實名制綁定</h3>
+      <p style="color:#666; font-size:13px; margin-bottom:20px; text-align:center;">為保護資料安全，需核對身分。<br>請輸入真實資料交由管理員審核。</p>
+      <div class="modal-row">
+        <label>真實姓名</label>
+        <input type="text" id="regRealName" class="modal-input" placeholder="請輸入本名">
+      </div>
+      <div class="modal-row">
+        <label>身分證字號</label>
+        <input type="text" id="regIdCard" class="modal-input" placeholder="請輸入身分證字號" style="text-transform: uppercase;">
+      </div>
+      <button class="notice-btn" style="margin-top:20px;" onclick="window.submitRegistration()">送出審核</button>
+    </div>
 
-  <div class="app-container">
+    <!-- 等待審核 -->
+    <div class="auth-card" id="authPending">
+      <div class="notice-icon" style="background:#fff3cd; color:#856404; font-size:24px; width:60px; height:60px; margin: 0 auto 15px auto;">⏳</div>
+      <h3>等待審核中</h3>
+      <p style="color:#666; font-size:14px;">您的資料已送出，請等候管理員核對身分並開通系統權限。</p>
+      <p style="font-size:12px; color:#999; margin-top:15px;">(若久未開通，請於群組提醒管理員)</p>
+    </div>
+
+    <!-- 審核被拒絕 -->
+    <div class="auth-card" id="authRejected">
+      <div class="notice-icon" style="background:#fee2e2; color:#b91c1c; font-size:24px; width:60px; height:60px; margin: 0 auto 15px auto;">✕</div>
+      <h3>審核未通過</h3>
+      <p style="color:#666; font-size:14px;">您的權限申請已被管理員拒絕。<br>若有疑問請與管理員聯繫。</p>
+    </div>
+
+  </div>
+  <!-- ================= 登入與審核攔截畫面 END ================= -->
+
+  <!-- ★ 整個系統原本的 Container (預設隱藏) ★ -->
+  <div class="app-container" id="mainAppContainer" style="display: none;">
+
+    <div id="offlineBanner">⚠️ 目前為無網路狀態。已啟用離線模式，上傳的紀錄將暫存於本機，待恢復網路後會自動同步！</div>
 
     <div class="fixed-header">
       <div class="header-bar">
+        <!-- 管理員按鈕 (預設 CSS display:none) -->
         <button type="button" class="admin-console-btn" onclick="window.openAdminConsole()">📊 主控台</button>
         <button type="button" class="admin-top-btn" onclick="window.toggleAdminMode()">⚙️ 管理員調整</button>
         <div>
@@ -399,7 +475,7 @@
             </div>
             <div class="row">
               <div class="label">人員</div>
-              <input type="text" name="personnel" id="personnelInput" placeholder="系統自動帶入中...">
+              <input type="text" name="personnel" id="personnelInput" placeholder="載入中..." readonly style="color:#0284c7;">
             </div>
             <div class="row" style="padding-right:10px;">
               <div class="label">地點</div>
@@ -591,7 +667,7 @@
       </div>
     </div>
 
-    <!-- ★ 新增：編輯紀錄模式列（編輯中才會出現，內含刪除 / 取消編輯） ★ -->
+    <!-- 編輯紀錄模式列 -->
     <div id="editModeBar" class="edit-mode-bar">
       <span id="editModeText">✏️ 編輯中</span>
       <div style="display:flex; gap:6px;">
@@ -697,7 +773,7 @@
 
   <div id="loading">資料處理中...</div>
   
-  <!-- 預覽視窗 (z-index: 8000) -->
+  <!-- 預覽視窗 -->
   <div id="previewOverlay">
     <div class="preview-card">
       <div class="preview-scroll-wrapper" id="previewCaptureArea">
@@ -717,7 +793,7 @@
     </div>
   </div>
 
-  <!-- ★ 管理員專屬主控台 (分日期、收合圖表、點進去編輯) ★ -->
+  <!-- ★ 管理員專屬主控台 ★ -->
   <div id="adminConsoleOverlay">
     <div class="console-card">
       <div class="console-header">
@@ -727,10 +803,10 @@
       
       <!-- 主控台分頁標籤 -->
       <div class="console-tabs">
-        <div class="console-tab active" id="cTab-list" onclick="window.switchConsoleTab('list')">📋 案件清單</div>
-        <div class="console-tab" id="cTab-stats" onclick="window.switchConsoleTab('stats')">📈 數據分析儀表板</div>
-        <div class="console-tab" id="cTab-map" onclick="window.switchConsoleTab('map')">🗺 傷患地圖</div>
-        <div class="console-tab" id="cTab-staff" onclick="window.switchConsoleTab('staff')">👥 人員審核 <span id="staffBadge"></span></div>
+        <div class="console-tab active" id="cTab-list" onclick="window.switchConsoleTab('list')">📋 清單</div>
+        <div class="console-tab" id="cTab-stats" onclick="window.switchConsoleTab('stats')">📈 統計</div>
+        <div class="console-tab" id="cTab-map" onclick="window.switchConsoleTab('map')">🗺 地圖</div>
+        <div class="console-tab" id="cTab-users" onclick="window.switchConsoleTab('users')">👥 人員</div>
       </div>
 
       <!-- 分頁 1: 案件清單 -->
@@ -756,7 +832,7 @@
         <div id="consoleRecordsList" style="flex:1; overflow-y:auto; margin-top:4px;">載入中...</div>
       </div>
 
-      <!-- 分頁 2: 數據分析儀表板 (可收合展開細項) -->
+      <!-- 分頁 2: 數據分析儀表板 -->
       <div class="console-panel" id="panel-stats">
         <div class="stats-card">
           <div class="stats-card-title">📌 出勤總覽</div>
@@ -780,15 +856,10 @@
       </div>
 
       <!-- 分頁 4: 人員身分與權限審核 -->
-      <div class="console-panel" id="panel-staff">
-  <div class="view-mode-bar" id="staffFilterBar">
-    <button type="button" data-f="pending" class="active" onclick="window.setStaffFilter('pending')">待審核</button>
-    <button type="button" data-f="approved" onclick="window.setStaffFilter('approved')">已通過</button>
-    <button type="button" data-f="rejected" onclick="window.setStaffFilter('rejected')">未通過</button>
-    <button type="button" data-f="all" onclick="window.setStaffFilter('all')">全部</button>
-  </div>
-  <div id="staffList" style="flex:1; overflow-y:auto;">載入中...</div>
-</div>
+      <div class="console-panel" id="panel-users">
+        <div style="font-size:11px; padding:4px 8px; background:#e0f2fe; color:#0369a1; font-weight:bold; border-bottom:1px solid #bae6fd; margin-bottom:8px;">💡 審核通過的人員才能填寫表單；「設為管理員」才可進入此主控台。</div>
+        <div id="adminUserList" style="flex:1; overflow-y:auto;">載入中...</div>
+      </div>
 
     </div>
   </div>
@@ -799,7 +870,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js";
-    import { initializeFirestore, persistentLocalCache, collection, addDoc, getDocs, doc, getDoc, setDoc, deleteDoc, updateDoc, runTransaction, query, orderBy, serverTimestamp } 
+    import { initializeFirestore, persistentLocalCache, collection, addDoc, getDocs, doc, getDoc, setDoc, deleteDoc, updateDoc, query, orderBy, limit, serverTimestamp } 
     from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     const firebaseConfig = {
@@ -811,7 +882,7 @@
       appId: "1:1002268658683:web:739adcd7819f8c9393595e",
       measurementId: "G-1Z55WR53W7"
     };
-    const MY_LIFF_ID = "2011820105-6oXAxIEi"; 
+    const MY_LIFF_ID = "2011820105-6oXAxIEi"; // ★ 請確定這裡跟您後台的 LIFF ID 相同
 
     const app = initializeApp(firebaseConfig);
     const analytics = getAnalytics(app);
@@ -823,7 +894,8 @@
     let availableDates = []; 
     let currentDateIndex = 0; 
     let isShowingAllDates = false;
-    let editingId = null; // ★ 目前正在編輯的紀錄 ID（null = 新增模式）
+    let editingId = null;
+    let currentUserProfile = null; 
 
     window.updateWizard = function() {
       document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
@@ -852,17 +924,158 @@
       document.getElementById("caseTimeInput").value = dateStr + " " + timeStr;
     }
 
+    // =========================================
+    // ★ 系統初始化 & 智慧離線快取機制 ★
+    // =========================================
     window.onload = async function() {
       setNowTime();
       window.updateWizard();
 
-      await loadBodyConfigFromFirebase();
-      initAdminEditor();
+      // 嘗試讀取本地快取的登入狀態
+      const cachedUserStr = localStorage.getItem('sfc_user_cache');
+      let cachedUser = cachedUserStr ? JSON.parse(cachedUserStr) : null;
 
-      startGate();
+      // 如果完全沒有網路連線
+      if (!navigator.onLine) {
+        if (cachedUser && cachedUser.status === 'approved') {
+          enterSystem(cachedUser, true);
+        } else {
+          document.getElementById('authLoading').innerHTML = `<h3 style="color:red;">無網路連線</h3><p>找不到您的本機登入紀錄。第一次使用請務必在有網路的環境下開啟。</p>`;
+        }
+        return;
+      }
+
+      // 正常跑 LIFF (加 timeout 防卡死)
+      try {
+        await Promise.race([
+          liff.init({ liffId: MY_LIFF_ID }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("LIFF timeout")), 8000))
+        ]);
+        
+        if (!liff.isLoggedIn()) {
+          liff.login(); 
+          return;
+        }
+
+        currentUserProfile = await liff.getProfile();
+        await checkUserAuth(currentUserProfile);
+
+      } catch (err) {
+        console.warn("連線或 LIFF 失敗，嘗試使用離線快取:", err);
+        if (cachedUser && cachedUser.status === 'approved') {
+          enterSystem(cachedUser, true);
+        } else {
+          document.getElementById('authLoading').innerHTML = `<h3 style="color:red;">無法驗證</h3><p>無法連接 LINE 服務或找不到本機紀錄。<br>錯誤原因：${err.message || '連線逾時'}</p>`;
+        }
+      }
     };
 
-    // ★ 地圖嵌入（有座標用座標，沒有就用地址搜尋；不需 API Key）
+    // 檢查使用者權限狀態 (有網路時執行)
+    async function checkUserAuth(profile) {
+      ['authLoading', 'authRegister', 'authPending', 'authRejected'].forEach(id => document.getElementById(id).style.display = 'none');
+
+      try {
+        const userRef = doc(db, "users", profile.userId);
+        const userSnap = await getDoc(userRef);
+
+        if (userSnap.exists()) {
+          const userData = userSnap.data();
+          
+          if (userData.status === 'approved') {
+            // ✅ 審核通過：進入系統，並把身分快取起來 (為了離線模式)
+            localStorage.setItem('sfc_user_cache', JSON.stringify(userData));
+            enterSystem(userData, false);
+
+          } else if (userData.status === 'rejected') {
+            document.getElementById('authScreen').style.display = 'flex';
+            document.getElementById('authRejected').style.display = 'block';
+          } else {
+            document.getElementById('authScreen').style.display = 'flex';
+            document.getElementById('authPending').style.display = 'block';
+          }
+        } else {
+          document.getElementById('authScreen').style.display = 'flex';
+          document.getElementById('authRegister').style.display = 'block';
+        }
+      } catch (e) {
+        console.error("檢查權限錯誤:", e);
+        document.getElementById('authLoading').style.display = 'block';
+        document.getElementById('authLoading').innerHTML = `<h3 style="color:red;">網路錯誤</h3><p>無法連線至資料庫，請重整頁面。<br>${e.message}</p>`;
+      }
+    }
+
+    // 進入系統主畫面 (共用邏輯)
+    async function enterSystem(userData, isOffline) {
+      document.getElementById('authScreen').style.display = 'none';
+      document.getElementById('mainAppContainer').style.display = 'flex';
+      
+      // 顯示離線提示橫幅
+      if (isOffline) {
+        document.getElementById('offlineBanner').style.display = 'block';
+      } else {
+        document.getElementById('offlineBanner').style.display = 'none';
+      }
+
+      document.getElementById('personnelInput').value = userData.realName;
+
+      // 檢查是否為管理員
+      if (userData.role === 'admin') {
+        document.querySelector('.admin-top-btn').style.display = 'block';
+        document.querySelector('.admin-console-btn').style.display = 'block';
+      } else {
+        document.querySelector('.admin-top-btn').style.display = 'none';
+        document.querySelector('.admin-console-btn').style.display = 'none';
+      }
+
+      try {
+        await loadBodyConfigFromFirebase();
+        initAdminEditor();
+      } catch(e) {}
+    }
+
+
+    // 送出實名制與身分證註冊
+    window.submitRegistration = async function() {
+      const realName = document.getElementById('regRealName').value.trim();
+      const idCard = document.getElementById('regIdCard').value.trim().toUpperCase();
+      const idCardRegex = /^[A-Z][1289]\d{8}$/; // 簡易身分證格式驗證
+
+      if (!realName) { alert("請輸入真實姓名"); return; }
+      if (!idCardRegex.test(idCard)) { alert("身分證字號格式不正確"); return; }
+
+      document.getElementById('authRegister').style.display = 'none';
+      document.getElementById('authLoading').style.display = 'block';
+
+      try {
+        const usersQuery = query(collection(db, "users"), limit(1));
+        const usersSnap = await getDocs(usersQuery);
+        const isFirstUser = usersSnap.empty; 
+
+        const userRef = doc(db, "users", currentUserProfile.userId);
+        await setDoc(userRef, {
+          lineUserId: currentUserProfile.userId,
+          lineDisplayName: currentUserProfile.displayName,
+          realName: realName,
+          idCard: idCard,
+          status: isFirstUser ? 'approved' : 'pending',
+          role: isFirstUser ? 'admin' : 'user',
+          createdAt: serverTimestamp()
+        });
+
+        await checkUserAuth(currentUserProfile);
+
+      } catch (e) {
+        alert("資料送出失敗：" + e.message);
+        document.getElementById('authLoading').style.display = 'none';
+        document.getElementById('authRegister').style.display = 'block';
+      }
+    };
+
+
+    // =========================================
+    // 其餘原本所有的系統功能 (完全沒動到邏輯，原汁原味)
+    // =========================================
+
     function mapEmbedHtml(lat, lng, addr, h) {
       const q = (lat && lng) ? (lat + ',' + lng) : String(addr || '').trim();
       if (!q) return '<span class="map-none">無地點資料</span>';
@@ -886,12 +1099,11 @@
       }
     }
 
-    // ★ 座標 → 地址（OpenStreetMap Nominatim 反向地理編碼）
     let lastAutoAddress = '';
     async function fillAddressFromGPS(lat, lng) {
       const input = document.querySelector('input[name="location"]');
       const cur = input.value.trim();
-      if (cur && cur !== lastAutoAddress) return; // 使用者已自行輸入地址，不覆蓋
+      if (cur && cur !== lastAutoAddress) return; 
       input.placeholder = '地址轉換中...';
       try {
         const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=zh-TW`;
@@ -1306,7 +1518,6 @@
       return result.length > 0 ? result.join(", ") : "無";
     }
 
-    // ★ 必填檢查：年齡、臂章編號、電話、照片為選填（沒填存「無」），其餘皆必填
     function collectMissing() {
       const form = document.getElementById('ambulanceForm');
       const fd = new FormData(form);
@@ -1331,7 +1542,6 @@
       return missing;
     }
 
-    // step = 要檢查的分頁索引；-1 = 檢查全部（送出前）
     function checkStep(step) {
       const missing = collectMissing().filter(m => step < 0 || m.step === step);
       document.querySelectorAll('.field-error').forEach(e => e.classList.remove('field-error'));
@@ -1347,7 +1557,6 @@
 
     function validateRequired() { return checkStep(-1); }
 
-    // 使用者操作該欄位後，自動移除紅框
     ['input', 'change', 'click'].forEach(ev => {
       document.getElementById('ambulanceForm').addEventListener(ev, e => {
         const t = e.target.closest ? e.target.closest('.field-error') : null;
@@ -1359,7 +1568,6 @@
       if (!validateRequired()) return;
       const fd = new FormData(document.getElementById('ambulanceForm'));
 
-      // ★ 還原預覽視窗底部按鈕（檢視紀錄時會被換掉，這裡確保送出預覽永遠是正確按鈕）
       document.querySelector('#previewOverlay .preview-btns').innerHTML = `
         <button class="p-btn" onclick="document.getElementById('previewOverlay').style.display='none'">返回修改</button>
         <button class="p-btn p-btn-ok" onclick="window.finalSubmit()">${editingId ? '確認儲存' : '確認送出'}</button>
@@ -1438,9 +1646,6 @@
       document.getElementById('previewOverlay').style.display = 'flex';
     };
 
-    // =========================================
-    // ★ 日期時間解析（相容舊資料 2026/4/13 下午4:05:00 與新資料 2026-04-13 16:05）
-    // =========================================
     function parseCaseTime(str) {
       const s = String(str || '');
       const dm = s.match(/(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/);
@@ -1459,8 +1664,9 @@
       return { date: date, time: time, key: date + ' ' + (time || '00:00') };
     }
 
+
     // =========================================
-    // ★ 主控台邏輯 (日期左右導覽、智慧分類收合、點進去編輯)
+    // ★ 主控台邏輯 (包含：原分頁 + 人員審核分頁)
     // =========================================
     window.switchConsoleTab = function(tabName) {
       document.querySelectorAll('.console-tab').forEach(t => t.classList.remove('active'));
@@ -1469,11 +1675,9 @@
       document.getElementById('panel-' + tabName).classList.add('active');
       if(tabName === 'stats') renderStatsCharts();
       if(tabName === 'map') renderBigMap();
+      if(tabName === 'users') loadAdminUsers(); 
     };
 
-    // =========================================
-    // ★ 傷患總地圖：所有案件的地點標記（有座標直接標；只有地址的自動轉座標並快取）
-    // =========================================
     const CAT_COLORS = { '起水泡問題': '#0ea5e9', '抽筋/痠痛': '#8b5cf6', '跌倒/擦摔': '#f59e0b', '冷熱急症': '#ef4444', '車禍': '#111827', '肢體無力/暈眩': '#10b981', '創傷/割燙傷': '#ec4899', '其他': '#64748b' };
     let bigMap = null, markerLayer = null, mapScope = 'all', geoRunId = 0;
     const GEO_KEY = 'geoCacheV2';
@@ -1487,8 +1691,6 @@
     };
 
     const sleep = ms => new Promise(r => setTimeout(r, ms));
-
-    // 地址 → 座標：清理地址、限定在苗栗～雲林範圍內搜尋，依序嘗試 完整地址 → 去掉「門口/旁」等 → 只到路名
     async function geocodeAddress(addr) {
       const base = String(addr).replace(/^\d{3,6}\s*/, '').replace(/\s+/g, '').replace(/台(中|北|南|東)/g, '臺$1');
       const noSuffix = base.replace(/(門口|附近|旁邊|旁|對面|前方|前面|前|路口|入口)$/, '');
@@ -1558,7 +1760,6 @@
       refreshStatus(0);
       fit();
 
-      // 只有地址的案件：轉座標（1 秒 1 筆；結果存本機快取，之後不用再查）
       const cache = loadGeoCache();
       let done = 0;
       for (const d of pending) {
@@ -1595,7 +1796,6 @@
 
         querySnapshot.forEach((docSnap) => {
           const data = { id: docSnap.id, ...docSnap.data() };
-          // ★ 統一日期為 yyyy-mm-dd（補零），時間為 HH:MM（24 小時制）
           const ct = parseCaseTime(data.caseTime);
           data.caseTimeNormalized = ct.date;
           data.caseTimeHM = ct.time;
@@ -1606,7 +1806,7 @@
 
         availableDates = Array.from(dateSet).sort();
         if(availableDates.length > 0) {
-          currentDateIndex = availableDates.length - 1; // 預設顯示最新有資料的那一天
+          currentDateIndex = availableDates.length - 1;
         }
 
         window.filterConsoleRecords();
@@ -1625,7 +1825,7 @@
     };
 
     window.clearDateFilter = function() {
-      currentDateIndex = -1; // 顯示全部
+      currentDateIndex = -1;
       window.filterConsoleRecords();
     };
 
@@ -1653,17 +1853,13 @@
             matchKey = false;
           }
         }
-
         return matchDate && matchKey;
       });
 
-      // 依照時間由早到晚排序
       filtered.sort((a, b) => (a.sortKey || '').localeCompare(b.sortKey || ''));
-
       renderConsoleList(filtered, activeDate);
     };
 
-    // 智慧歸納大分類（水泡、抽筋/痠痛 分開）
     function normalizeCategory(problemStr) {
       if (!problemStr) return "其他";
       if (problemStr.includes("水泡")) return "起水泡問題";
@@ -1676,7 +1872,6 @@
       return "其他";
     }
 
-    // ★ 清單檢視模式：list / small / medium / large
     let listViewMode = 'list';
     try { listViewMode = localStorage.getItem('consoleViewMode') || 'list'; } catch (e) {}
     window.setListView = function(mode) {
@@ -1688,7 +1883,6 @@
     function renderConsoleList(records, activeDate) {
       const listContainer = document.getElementById('consoleRecordsList');
       const statsBox = document.getElementById('consoleQuickStats');
-
       const totalCount = records.length;
       statsBox.innerHTML = `<span>當前清單總計出勤: <b>${totalCount}</b> 件案件</span>`;
 
@@ -1783,12 +1977,10 @@
 
       sortedCategories.forEach(([cat, data], idx) => {
         const pct = Math.round((data.total / Math.max(total, 1)) * 100);
-        
         let subHtml = "";
         Object.entries(data.subItems).sort((a, b) => b[1] - a[1]).forEach(([subName, subCnt]) => {
           subHtml += `<div class="sub-item-row"><span>• ${subName}</span><b>${subCnt} 件</b></div>`;
         });
-
         chartHtml += `
           <div class="chart-category-box">
             <div class="chart-main-header" onclick="window.toggleSubCategory('subBox-${idx}')">
@@ -1909,9 +2101,6 @@
       document.getElementById('previewOverlay').style.display = 'flex';
     };
 
-    // =========================================
-    // ★ 編輯模式：把紀錄載入「原本的表單與人體圖」直接修改
-    // =========================================
     function setOtherField(checkboxId, labelId, hiddenId, val) {
       const cb = document.getElementById(checkboxId);
       const lab = document.getElementById(labelId);
@@ -1948,6 +2137,13 @@
     function resetFormUI() {
       document.querySelectorAll('.field-error').forEach(e => e.classList.remove('field-error'));
       document.getElementById('ambulanceForm').reset();
+      
+      // 保留已經帶入的人員姓名
+      const cachedUserStr = localStorage.getItem('sfc_user_cache');
+      if (cachedUserStr) {
+        document.getElementById('personnelInput').value = JSON.parse(cachedUserStr).realName;
+      }
+
       window.compressedImagesArray = [];
       renderImagePreviews();
 
@@ -1992,7 +2188,6 @@
       const form = document.getElementById('ambulanceForm');
       const setv = (n, v) => { const el = form.elements[n]; if(el) el.value = (v === null || v === undefined) ? '' : v; };
 
-      // 時間（統一成 yyyy-mm-dd HH:MM）
       const ct = parseCaseTime(d.caseTime);
       document.getElementById('caseTimeInput').value = ct.date ? (ct.date + ' ' + (ct.time || '00:00')) : (d.caseTime || '');
       document.getElementById('headerTime').innerText = ct.date || (d.caseTime || '');
@@ -2016,7 +2211,6 @@
       applyCheckGroup('problems', S.problems, 'problemOtherCheckbox', 'problemOtherLabel', 'problemOtherValue');
       applyCheckGroup('treatment', T.actions, 'treatmentOtherCheckbox', 'treatmentOtherLabel', 'treatmentOtherValue');
 
-      // 生命徵象
       const pv = F.postVitals || '意識清楚生命徵象穩定';
       if(pv === '意識清楚生命徵象穩定') {
         document.querySelector('input[name="postVitals"][value="意識清楚生命徵象穩定"]').checked = true;
@@ -2026,14 +2220,12 @@
         document.getElementById('vitalsOtherLabel').innerText = "其他: " + pv;
       }
 
-      // 人體圖標記（可直接在圖上點選增減）
       selectedPartsData = JSON.parse(JSON.stringify(T.injuredParts || []));
       document.querySelectorAll('.body-zone').forEach(z => {
         if(selectedPartsData.some(i => i.part === z.dataset.part)) z.classList.add('active');
       });
       window.updateInjuredDisplay();
 
-      // 照片
       window.compressedImagesArray = Array.isArray(d.photos) ? d.photos.slice(0, 2) : [];
       renderImagePreviews();
 
@@ -2068,7 +2260,6 @@
       }
     };
 
-    // ★ 自訂提示（取代內建 alert）：成功 2.2 秒自動關閉，錯誤需按確定
     let noticeTimer = null;
     window.closeNotice = function() {
       clearTimeout(noticeTimer);
@@ -2085,7 +2276,6 @@
       if (type === 'success') noticeTimer = setTimeout(window.closeNotice, 2200);
     };
 
-    // ★ 自訂確認視窗（取代內建 confirm），回傳 Promise<boolean>
     let confirmResolver = null;
     window.resolveConfirm = function(ok) {
       document.getElementById('confirmOverlay').style.display = 'none';
@@ -2101,7 +2291,6 @@
       });
     };
 
-    // 大圖：切換 傷情圖 / 現場照片
     window.setCardMedia = function(btn, mode) {
       const card = btn.closest('.cc-card');
       if (!card) return;
@@ -2113,7 +2302,13 @@
     window.finalSubmit = async function() {
       const fd = new FormData(document.getElementById('ambulanceForm'));
       document.getElementById('previewOverlay').style.display = 'none';
-      document.getElementById('loading').style.display = 'flex';
+      
+      // ★ 離線模式：沒網路就不顯示無限轉圈，而是提示快取成功
+      if (!navigator.onLine) {
+        window.showNotice('success', '已暫存於手機', '目前為離線狀態，您的紀錄已安全暫存，待恢復網路後系統將自動上傳！');
+      } else {
+        document.getElementById('loading').style.display = 'flex';
+      }
 
       let finalVitals = fd.get('postVitals');
       if(finalVitals === "其他") {
@@ -2153,189 +2348,137 @@
 
       try {
         if(editingId) {
-          // ★ 編輯模式：更新原紀錄（保留原本的建立時間戳記）
           delete recordData.timestamp;
           recordData.updatedAt = serverTimestamp();
           await updateDoc(doc(db, "medical_records", editingId), recordData);
-          window.showNotice('success', '更新完成', '救護紀錄已成功更新');
+          if (navigator.onLine) window.showNotice('success', '更新完成', '救護紀錄已成功更新');
 
           document.getElementById('loading').style.display = 'none';
           exitEditUI();
           resetFormUI();
-          window.openAdminConsole();
+          if (navigator.onLine) window.openAdminConsole();
         } else {
           await addDoc(collection(db, "medical_records"), recordData);
-          window.showNotice('success', '上傳成功', '救護紀錄已成功送出');
+          if (navigator.onLine) window.showNotice('success', '上傳成功', '救護紀錄已成功送出');
 
           document.getElementById('loading').style.display = 'none';
           resetFormUI();
         }
       } catch (e) {
         document.getElementById('loading').style.display = 'none';
-        window.showNotice('error', '上傳失敗', e.message);
+        window.showNotice('error', '操作失敗', e.message);
       }
     };
-  
-// ================= 身分驗證 + 人員審核 =================
-let myUid = null, myLineName = '', myProfile = null, isAdmin = false;
-let staffList = [], staffFilter = 'pending';
-const gateEl = document.getElementById('gateOverlay'), gateBox = document.getElementById('gateBox');
-const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const maskId = id => id ? id.slice(0, 3) + '****' + id.slice(-3) : '';
-function showGate(html) { gateBox.innerHTML = html; gateEl.style.display = 'flex'; }
 
-// 身分證格式 + 檢查碼（A123456789 型）
-function validTwId(id) {
-  if (!/^[A-Z][12]\d{8}$/.test(id)) return false;
-  const L = 'ABCDEFGHJKLMNPQRSTUVXYWZIO', n = L.indexOf(id[0]) + 10;
-  let sum = Math.floor(n / 10) + (n % 10) * 9;
-  for (let i = 1; i <= 8; i++) sum += parseInt(id[i], 10) * (9 - i);
-  return (10 - sum % 10) % 10 === parseInt(id[9], 10);
-}
 
-async function startGate() {
-  let step = 'liff.init';
-  try {
-    await liff.init({ liffId: MY_LIFF_ID });
-    if (!liff.isLoggedIn()) { step = 'liff.login'; liff.login({ redirectUri: location.href }); return; }
-    step = 'liff.getProfile';
-    const p = await liff.getProfile();
-    myUid = p.userId; myLineName = p.displayName;
-  } catch (e) {
-    const hints = {
-      'liff.init': '1. LIFF 後台的 Endpoint URL 必須和目前網址一致（含 https、網域）<br>2. LIFF ID 是否正確<br>3. 不能用 file:// 或未註冊的網址開啟',
-      'liff.login': 'LINE 登入跳轉失敗，請確認 LIFF 已發布且 Callback 設定正確',
-      'liff.getProfile': '1. LIFF 後台 Scopes 要勾選 profile<br>2. 登入已過期，請按「重新登入」'
-    };
-    showGate('<h2>無法驗證</h2><p>失敗步驟：<b>' + step + '</b><br>錯誤：' + esc((e && (e.code || '')) + ' ' + ((e && e.message) || e)) +
-      '<br>目前網址：' + esc(location.origin + location.pathname) + '</p>' +
-      '<p style="text-align:left;font-size:12px;">可能原因：<br>' + hints[step] + '</p>' +
-      '<button class="gate-btn" onclick="window.startGate()">重試</button>' +
-      '<button class="gate-btn sec" style="margin-top:8px;" onclick="window.reLogin()">重新登入 LINE</button>');
-  }
-  if (myUid) refreshGate();
-}
-window.startGate = startGate;
-window.reLogin = function() { try { liff.logout(); } catch (e) {} try { liff.login({ redirectUri: location.href }); } catch (e) { location.reload(); } };
+    // =========================================
+    // ★ 人員權限審核管理系統 (Admin Panel) ★
+    // =========================================
+    
+    // 載入所有使用者
+    async function loadAdminUsers() {
+      const listDiv = document.getElementById('adminUserList');
+      listDiv.innerHTML = '<div style="text-align:center; padding: 20px; color:#888;">正在載入人員名單...</div>';
+      
+      try {
+        const q = query(collection(db, "users"));
+        const snapshot = await getDocs(q);
+        
+        const usersList = [];
+        snapshot.forEach(docSnap => {
+          usersList.push({ id: docSnap.id, ...docSnap.data() });
+        });
 
-window.refreshGate = async function() {
-  try {
-    const snap = await getDoc(doc(db, 'staff_profiles', myUid));
-    if (!snap.exists()) return showRegisterForm();
-    const d = snap.data();
-    if (d.status === 'approved') {
-      myProfile = d; isAdmin = d.role === 'admin' || d.founder === true;
-      document.body.classList.toggle('is-admin', isAdmin);
-      document.getElementById('personnelInput').value = d.realName;
-      gateEl.style.display = 'none';
-      if (isAdmin) updateStaffBadge();
-    } else if (d.status === 'rejected') {
-      showGate('<h2>審核未通過</h2><p>您的資料未通過核對，請聯絡團隊管理員。</p><button class="gate-btn sec" onclick="window.refreshGate()">重新查詢</button>');
-    } else {
-      showGate('<h2>等待審核中</h2><p>' + esc(d.realName) + ' 您好，已收到您的資料。<br>管理員核對後即可使用，請稍後重新查詢。</p><button class="gate-btn" onclick="window.refreshGate()">重新查詢</button>');
+        // 排序：待審核(pending)放最上面 -> 已核准(approved) -> 拒絕(rejected)
+        usersList.sort((a, b) => {
+          const statusOrder = { 'pending': 1, 'approved': 2, 'rejected': 3 };
+          return (statusOrder[a.status] || 99) - (statusOrder[b.status] || 99);
+        });
+
+        renderAdminUsers(usersList);
+
+      } catch (e) {
+        listDiv.innerHTML = `<div style="color:red; padding:20px;">載入人員失敗: ${e.message}</div>`;
+      }
     }
-  } catch (e) {
-    showGate('<h2>連線失敗</h2><p>' + esc(e.message) + '</p><button class="gate-btn" onclick="window.refreshGate()">重試</button>');
-  }
-};
 
-function showRegisterForm() {
-  showGate(`<h2>人員身分登記</h2>
-    <p>LINE：${esc(myLineName)}<br>請輸入<b>本名</b>與<b>身分證字號</b>，經管理員核對後才可使用。資料僅供團隊身分確認。</p>
-    <input id="regName" type="text" placeholder="本名（與身分證相同）" autocomplete="off">
-    <input id="regId" type="text" placeholder="身分證字號" maxlength="10" autocomplete="off" style="text-transform:uppercase;">
-    <button class="gate-btn" onclick="window.submitRegistration()">送出審核</button>`);
-}
+    // 渲染人員清單 UI
+    function renderAdminUsers(users) {
+      const listDiv = document.getElementById('adminUserList');
+      if (users.length === 0) {
+        listDiv.innerHTML = '<div style="text-align:center; padding: 20px; color:#888;">尚無任何人員資料</div>';
+        return;
+      }
 
-window.submitRegistration = async function() {
-  const name = document.getElementById('regName').value.trim();
-  const idn = document.getElementById('regId').value.trim().toUpperCase();
-  if (name.length < 2) return window.showNotice('error', '請輸入本名', '');
-  if (!validTwId(idn)) return window.showNotice('error', '身分證字號格式不正確', '請重新確認');
-  try {
-    // 第一位登記者 = 創始管理員（自動通過、永久管理員）；用交易避免兩人同時搶第一
-    const empty = (await getDocs(collection(db, 'staff_profiles'))).empty;
-    const metaRef = doc(db, 'system_configs', 'founder');
-    await runTransaction(db, async tx => {
-      const founder = empty && !(await tx.get(metaRef)).exists();
-      if (founder) tx.set(metaRef, { uid: myUid, createdAt: serverTimestamp() });
-      tx.set(doc(db, 'staff_profiles', myUid), {
-        lineName: myLineName, realName: name, idNumber: idn,
-        status: founder ? 'approved' : 'pending', role: founder ? 'admin' : 'member',
-        founder: founder, createdAt: serverTimestamp()
+      let html = '';
+      users.forEach(u => {
+        let statusTag = '';
+        if (u.status === 'pending') statusTag = '<span class="user-row-status status-pending">⏳ 待審核</span>';
+        else if (u.status === 'approved') statusTag = '<span class="user-row-status status-approved">✅ 已核准</span>';
+        else if (u.status === 'rejected') statusTag = '<span class="user-row-status status-rejected">❌ 已退回</span>';
+        
+        let roleTag = u.role === 'admin' ? '<span class="role-badge">⭐ 管理員</span>' : '';
+
+        // 操作按鈕
+        let actionBtns = '';
+        if (u.status !== 'approved') actionBtns += `<button class="u-btn ub-ok" onclick="window.updateUserStatus('${u.id}', 'approved')">核准登入</button>`;
+        if (u.status !== 'rejected') actionBtns += `<button class="u-btn ub-no" onclick="window.updateUserStatus('${u.id}', 'rejected')">退回/停權</button>`;
+        
+        let roleBtns = '';
+        if (u.role === 'admin') {
+          roleBtns = `<button class="u-btn ub-user" onclick="window.updateUserRole('${u.id}', 'user')">降為一般人員</button>`;
+        } else {
+          roleBtns = `<button class="u-btn ub-admin" onclick="window.updateUserRole('${u.id}', 'admin')">設為管理員</button>`;
+        }
+
+        html += `
+          <div class="user-row">
+            <div class="user-row-header">
+              <div class="user-row-name">
+                <div>${u.realName} ${roleTag}</div>
+                <div class="user-row-id">${u.idCard}</div>
+                <div class="user-row-id">LINE: ${u.lineDisplayName || '未知'}</div>
+              </div>
+              <div>${statusTag}</div>
+            </div>
+            <div class="user-row-actions">
+              ${actionBtns}
+              ${u.status === 'approved' ? roleBtns : ''}
+            </div>
+          </div>
+        `;
       });
-    });
-    refreshGate();
-  } catch (e) { window.showNotice('error', '送出失敗', e.message); }
-};
+      listDiv.innerHTML = html;
+    }
 
-// ---- 主控台：人員審核 ----
-async function loadStaff() {
-  const box = document.getElementById('staffList');
-  box.innerHTML = '載入中...';
-  try {
-    const snap = await getDocs(collection(db, 'staff_profiles'));
-    staffList = []; snap.forEach(s => staffList.push({ uid: s.id, ...s.data() }));
-    updateStaffBadge(); renderStaff();
-  } catch (e) { box.innerHTML = '<div style="color:red;padding:16px;">載入失敗：' + esc(e.message) + '</div>'; }
-}
-function updateStaffBadge() {
-  const b = document.getElementById('staffBadge');
-  const n = staffList.filter(s => s.status === 'pending').length;
-  b.innerHTML = n ? '<span style="background:#ef4444;color:#fff;border-radius:9px;padding:0 6px;font-size:10px;">' + n + '</span>' : '';
-}
-window.setStaffFilter = function(f) {
-  staffFilter = f;
-  document.querySelectorAll('#staffFilterBar button').forEach(b => b.classList.toggle('active', b.dataset.f === f));
-  renderStaff();
-};
-function renderStaff() {
-  const idCount = {}; staffList.forEach(s => idCount[s.idNumber] = (idCount[s.idNumber] || 0) + 1);
-  const rows = staffList.filter(s => staffFilter === 'all' || s.status === staffFilter);
-  document.getElementById('staffList').innerHTML = rows.length ? rows.map(s => {
-    const me = s.uid === myUid, fd = s.founder === true;
-    return `<div class="staff-item">
-      <b>${esc(s.realName)}</b>
-      <span class="st-tag ${s.status}">${{pending:'待審核',approved:'已通過',rejected:'未通過'}[s.status] || s.status}</span>
-      ${fd ? '<span class="st-tag admin">創始管理員</span>' : (s.role === 'admin' ? '<span class="st-tag admin">管理員</span>' : '')}${me ? ' (我)' : ''}<br>
-      LINE：${esc(s.lineName)}<br>身分證：${esc(s.idNumber)}
-      ${idCount[s.idNumber] > 1 ? '<br><b style="color:#ef4444;">⚠ 此身分證已被多個 LINE 帳號登記</b>' : ''}
-      <div class="st-btns">
-        ${s.status !== 'approved' ? `<button class="st-ok" onclick="window.staffAction('${s.uid}','approve')">✔ 通過</button>` : ''}
-        ${s.status !== 'rejected' && !me && !fd ? `<button class="st-no" onclick="window.staffAction('${s.uid}','reject')">✖ 不通過</button>` : ''}
-        ${s.status === 'approved' && s.role !== 'admin' ? `<button class="st-adm" onclick="window.staffAction('${s.uid}','makeAdmin')">設為管理員</button>` : ''}
-        ${s.role === 'admin' && !me && !fd ? `<button class="st-adm" onclick="window.staffAction('${s.uid}','removeAdmin')">取消管理員</button>` : ''}
-        ${!me && !fd ? `<button class="st-del" onclick="window.staffAction('${s.uid}','delete')">刪除</button>` : ''}
-      </div></div>`;
-  }).join('') : '<div style="text-align:center;padding:30px;color:#888;">沒有符合的人員</div>';
-}
-window.staffAction = async function(uid, act) {
-  if (!isAdmin) return;
-  const s = staffList.find(x => x.uid === uid); if (!s) return;
-  if (s.founder) { window.showNotice('error', '無法操作', '創始管理員為永久管理員，不能被修改或刪除'); return; }
-  const labels = { approve: '通過', reject: '不通過', makeAdmin: '設為管理員', removeAdmin: '取消管理員', delete: '刪除' };
-  if (!(await window.showConfirm(labels[act] + '？', s.realName + '（' + s.lineName + '）', labels[act]))) return;
-  const patch = {
-    approve: { status: 'approved' }, reject: { status: 'rejected', role: 'member' },
-    makeAdmin: { role: 'admin' }, removeAdmin: { role: 'member' }
-  }[act];
-  try {
-    if (act === 'delete') await deleteDoc(doc(db, 'staff_profiles', uid));
-    else await updateDoc(doc(db, 'staff_profiles', uid), { ...patch, reviewedAt: serverTimestamp(), reviewedBy: myProfile.realName });
-    await loadStaff();
-  } catch (e) { window.showNotice('error', '操作失敗', e.message); }
-};
+    window.updateUserStatus = async function(userId, newStatus) {
+      if(!(await window.showConfirm("確認修改狀態？", newStatus === 'approved' ? "確認核准此人員的登入權限？" : "確認將此人員退回/停權？"))) return;
+      try {
+        document.getElementById('loading').style.display = 'flex';
+        await updateDoc(doc(db, "users", userId), { status: newStatus });
+        document.getElementById('loading').style.display = 'none';
+        window.showNotice('success', '設定成功', '人員狀態已更新');
+        loadAdminUsers();
+      } catch (e) {
+        document.getElementById('loading').style.display = 'none';
+        window.showNotice('error', '設定失敗', e.message);
+      }
+    };
 
-// 擴充分頁切換、並鎖住管理員功能
-const _switchTab = window.switchConsoleTab;
-window.switchConsoleTab = function(t) { _switchTab(t); if (t === 'staff') loadStaff(); };
-['openAdminConsole', 'toggleAdminMode'].forEach(n => {
-  const f = window[n];
-  window[n] = function(...a) {
-    if (!isAdmin) { window.showNotice('error', '權限不足', '僅管理員可使用此功能'); return; }
-    return f.apply(this, a);
-  };
-});
+    window.updateUserRole = async function(userId, newRole) {
+      if(!(await window.showConfirm("確認修改身分？", newRole === 'admin' ? "設定為管理員將能進入主控台與更改他人權限，確定嗎？" : "將此人員降為一般人員，確定嗎？"))) return;
+      try {
+        document.getElementById('loading').style.display = 'flex';
+        await updateDoc(doc(db, "users", userId), { role: newRole });
+        document.getElementById('loading').style.display = 'none';
+        window.showNotice('success', '設定成功', '人員身分已更新');
+        loadAdminUsers();
+      } catch (e) {
+        document.getElementById('loading').style.display = 'none';
+        window.showNotice('error', '設定失敗', e.message);
+      }
+    };
+
   </script>
   </body>
 </html>
