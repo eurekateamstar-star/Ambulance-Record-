@@ -2194,17 +2194,29 @@ function validTwId(id) {
 }
 
 async function startGate() {
+  let step = 'liff.init';
   try {
     await liff.init({ liffId: MY_LIFF_ID });
-    if (!liff.isLoggedIn()) { liff.login(); return; }
+    if (!liff.isLoggedIn()) { step = 'liff.login'; liff.login({ redirectUri: location.href }); return; }
+    step = 'liff.getProfile';
     const p = await liff.getProfile();
     myUid = p.userId; myLineName = p.displayName;
   } catch (e) {
-    showGate('<h2>無法驗證</h2><p>請從 LINE 內開啟此頁面。</p>');
-    return;
+    const hints = {
+      'liff.init': '1. LIFF 後台的 Endpoint URL 必須和目前網址一致（含 https、網域）<br>2. LIFF ID 是否正確<br>3. 不能用 file:// 或未註冊的網址開啟',
+      'liff.login': 'LINE 登入跳轉失敗，請確認 LIFF 已發布且 Callback 設定正確',
+      'liff.getProfile': '1. LIFF 後台 Scopes 要勾選 profile<br>2. 登入已過期，請按「重新登入」'
+    };
+    showGate('<h2>無法驗證</h2><p>失敗步驟：<b>' + step + '</b><br>錯誤：' + esc((e && (e.code || '')) + ' ' + ((e && e.message) || e)) +
+      '<br>目前網址：' + esc(location.origin + location.pathname) + '</p>' +
+      '<p style="text-align:left;font-size:12px;">可能原因：<br>' + hints[step] + '</p>' +
+      '<button class="gate-btn" onclick="window.startGate()">重試</button>' +
+      '<button class="gate-btn sec" style="margin-top:8px;" onclick="window.reLogin()">重新登入 LINE</button>');
   }
-  refreshGate();
+  if (myUid) refreshGate();
 }
+window.startGate = startGate;
+window.reLogin = function() { try { liff.logout(); } catch (e) {} try { liff.login({ redirectUri: location.href }); } catch (e) { location.reload(); } };
 
 window.refreshGate = async function() {
   try {
