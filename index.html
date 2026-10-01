@@ -33,7 +33,6 @@
       .header-sub { font-size: 14px; font-weight: 600; color: #888; text-align: right; }
       .header-org-name { font-size: 10px; font-weight: 600; color: #999; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 2px; }
       
-      /* ★ 權限控管：管理員按鈕預設隱藏，驗證後用 JS 打開 ★ */
       .admin-top-btn { display: none; position: absolute; top: 12px; right: 16px; background: #333; color: #ffeb3b; border: 1px solid #ffeb3b; padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: bold; cursor: pointer; z-index: 2500; }
       .admin-console-btn { display: none; position: absolute; top: 12px; right: 115px; background: #0284c7; color: #fff; border: none; padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: bold; cursor: pointer; z-index: 2500; }
 
@@ -136,22 +135,22 @@
       .injury-item-row { border-bottom: 1px solid rgba(0,0,0,0.05); padding: 4px 0; font-family: monospace; }
       .injury-item-row:last-child { border-bottom: none; }
 
-      /* 管理員樣式 */
+      /* 管理員樣式 - 鎖定 touch-action 防止手機滑動干擾 */
       .admin-mode-bar { display: none; position: fixed; bottom: 85px; left: 10px; right: 10px; background: rgba(0,0,0,0.9); color: #fff; padding: 12px 15px; border-radius: 16px; z-index: 4000; justify-content: space-between; align-items: center; font-size: 13px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
       .admin-mode-bar.active { display: flex; flex-direction: column; gap: 8px; }
       .admin-btns-group { display: flex; gap: 6px; width: 100%; justify-content: space-between; }
       .admin-btn { background: #D65A68; color: white; border: none; padding: 8px 12px; border-radius: 8px; font-weight: bold; cursor: pointer; flex: 1; font-size: 12px; }
-      .admin-editing .body-zone { border: 1px dashed #ffeb3b !important; background: rgba(255, 235, 59, 0.25) !important; cursor: move !important; }
+      .admin-editing .body-zone { border: 1px dashed #ffeb3b !important; background: rgba(255, 235, 59, 0.25) !important; cursor: move !important; touch-action: none !important; }
       .admin-editing .body-zone.selected-admin { border: 2px solid #00e676 !important; background: rgba(0, 230, 118, 0.4) !important; z-index: 100 !important; }
       
-      .resize-handle { display: none; position: absolute; width: 12px; height: 12px; background: #00e676; border: 2px solid #fff; border-radius: 50%; z-index: 101; }
+      .resize-handle { display: none; position: absolute; width: 12px; height: 12px; background: #00e676; border: 2px solid #fff; border-radius: 50%; z-index: 101; touch-action: none !important; }
       .selected-admin .resize-handle { display: block; }
       .handle-tl { top: -6px; left: -6px; cursor: nwse-resize; }
       .handle-tr { top: -6px; right: -6px; cursor: nesw-resize; }
       .handle-bl { bottom: -6px; left: -6px; cursor: nesw-resize; }
       .handle-br { bottom: -6px; right: -6px; cursor: nwse-resize; }
       
-      .rotate-handle { display: none; position: absolute; top: -25px; left: 50%; transform: translateX(-50%); width: 14px; height: 14px; background: #ff9800; border: 2px solid #fff; border-radius: 50%; z-index: 102; cursor: grab; }
+      .rotate-handle { display: none; position: absolute; top: -25px; left: 50%; transform: translateX(-50%); width: 14px; height: 14px; background: #ff9800; border: 2px solid #fff; border-radius: 50%; z-index: 102; cursor: grab; touch-action: none !important; }
       .selected-admin .rotate-handle { display: block; }
       .rotate-line { display: none; position: absolute; top: -25px; left: 50%; width: 2px; height: 25px; background: #ff9800; z-index: 101; }
       .selected-admin .rotate-line { display: block; }
@@ -426,7 +425,6 @@
 
     <div class="fixed-header">
       <div class="header-bar">
-        <!-- 管理員按鈕 (預設 CSS display:none) -->
         <button type="button" class="admin-console-btn" onclick="window.openAdminConsole()">📊 主控台</button>
         <button type="button" class="admin-top-btn" onclick="window.toggleAdminMode()">⚙️ 管理員調整</button>
         <div>
@@ -863,7 +861,7 @@
       appId: "1:1002268658683:web:739adcd7819f8c9393595e",
       measurementId: "G-1Z55WR53W7"
     };
-    const MY_LIFF_ID = "2011820105-6oXAxIEi"; // ★ 請確定這裡跟您後台的 LIFF ID 相同
+    const MY_LIFF_ID = "2011820105-6oXAxIEi"; 
 
     const app = initializeApp(firebaseConfig);
     const analytics = getAnalytics(app);
@@ -1054,7 +1052,7 @@
 
 
     // =========================================
-    // 其餘原本所有的系統功能 (完全沒動到邏輯，原汁原味)
+    // ★ 原本的其他系統功能 (完全沒動到邏輯)
     // =========================================
 
     function mapEmbedHtml(lat, lng, addr, h) {
@@ -1193,8 +1191,14 @@
       }
     };
 
+    // =========================================
+    // ★ [重要更新] 全面支援手機觸控 (Touch) 拖曳與調整
+    // =========================================
     function initAdminEditor() {
       const container = document.getElementById('bodyMapContainer');
+
+      // 取得觸控或滑鼠的座標
+      const getPos = (e) => (e.touches && e.touches.length > 0) ? e.touches[0] : e;
 
       document.querySelectorAll('.body-zone').forEach(zone => {
         ['tl', 'tr', 'bl', 'br'].forEach(pos => {
@@ -1210,55 +1214,71 @@
         zone.appendChild(rotLine);
         zone.appendChild(rotHandle);
 
-        zone.addEventListener('click', (e) => {
+        const selectZone = (e) => {
           if (!isAdminMode) return;
           e.stopPropagation();
           document.querySelectorAll('.body-zone').forEach(z => z.classList.remove('selected-admin'));
           zone.classList.add('selected-admin');
           activeAdminZone = zone;
-        });
+        };
+        zone.addEventListener('click', selectZone);
 
         let isDragging = false;
         let startX, startY, initialLeft, initialTop;
 
-        zone.addEventListener('mousedown', (e) => {
+        const startDrag = (e) => {
           if (!isAdminMode || e.target.classList.contains('resize-handle') || e.target.classList.contains('rotate-handle')) return;
           isDragging = true;
-          startX = e.clientX; startY = e.clientY;
+          const p = getPos(e);
+          startX = p.clientX; startY = p.clientY;
           initialLeft = parseFloat(zone.style.left) || parsePercent(zone, 'left', container.clientWidth);
           initialTop = parseFloat(zone.style.top) || parsePercent(zone, 'top', container.clientHeight);
           e.stopPropagation();
-        });
+        };
+        zone.addEventListener('mousedown', startDrag);
+        zone.addEventListener('touchstart', startDrag, { passive: true });
 
-        window.addEventListener('mousemove', (e) => {
+        const doDrag = (e) => {
           if (!isDragging || !isAdminMode) return;
-          const dx = e.clientX - startX;
-          const dy = e.clientY - startY;
+          if (e.cancelable) e.preventDefault(); // 防止手機畫面捲動
+          const p = getPos(e);
+          const dx = p.clientX - startX;
+          const dy = p.clientY - startY;
           zone.style.left = (initialLeft + (dx / container.clientWidth) * 100).toFixed(2) + '%';
           zone.style.top = (initialTop + (dy / container.clientHeight) * 100).toFixed(2) + '%';
-        });
+        };
+        window.addEventListener('mousemove', doDrag);
+        window.addEventListener('touchmove', doDrag, { passive: false });
 
-        window.addEventListener('mouseup', () => { isDragging = false; });
+        const stopDrag = () => { isDragging = false; };
+        window.addEventListener('mouseup', stopDrag);
+        window.addEventListener('touchend', stopDrag);
 
+        // --- 縮放處理 ---
         zone.querySelectorAll('.resize-handle').forEach(handle => {
           let isResizing = false;
           let rStartX, rStartY, initW, initH, initL, initT;
 
-          handle.addEventListener('mousedown', (e) => {
+          const startResize = (e) => {
             if (!isAdminMode) return;
             isResizing = true;
-            rStartX = e.clientX; rStartY = e.clientY;
+            const p = getPos(e);
+            rStartX = p.clientX; rStartY = p.clientY;
             initW = parseFloat(zone.style.width) || 10;
             initH = parseFloat(zone.style.height) || 10;
             initL = parseFloat(zone.style.left) || 0;
             initT = parseFloat(zone.style.top) || 0;
             e.stopPropagation();
-          });
+          };
+          handle.addEventListener('mousedown', startResize);
+          handle.addEventListener('touchstart', startResize, { passive: true });
 
-          window.addEventListener('mousemove', (e) => {
+          const doResize = (e) => {
             if (!isResizing || !isAdminMode) return;
-            const dx = ((e.clientX - rStartX) / container.clientWidth) * 100;
-            const dy = ((e.clientY - rStartY) / container.clientHeight) * 100;
+            if (e.cancelable) e.preventDefault();
+            const p = getPos(e);
+            const dx = ((p.clientX - rStartX) / container.clientWidth) * 100;
+            const dy = ((p.clientY - rStartY) / container.clientHeight) * 100;
 
             if (handle.classList.contains('handle-br')) {
               zone.style.width = Math.max(2, initW + dx) + '%';
@@ -1277,29 +1297,42 @@
               zone.style.height = Math.max(2, initH - dy) + '%';
               zone.style.top = (initT + dy) + '%';
             }
-          });
+          };
+          window.addEventListener('mousemove', doResize);
+          window.addEventListener('touchmove', doResize, { passive: false });
 
-          window.addEventListener('mouseup', () => { isResizing = false; });
+          const stopResize = () => { isResizing = false; };
+          window.addEventListener('mouseup', stopResize);
+          window.addEventListener('touchend', stopResize);
         });
 
+        // --- 旋轉處理 ---
         let isRotating = false;
-        rotHandle.addEventListener('mousedown', (e) => {
+        const startRotate = (e) => {
           if (!isAdminMode) return;
           isRotating = true;
           e.stopPropagation();
-        });
+        };
+        rotHandle.addEventListener('mousedown', startRotate);
+        rotHandle.addEventListener('touchstart', startRotate, { passive: true });
 
-        window.addEventListener('mousemove', (e) => {
+        const doRotate = (e) => {
           if (!isRotating || !isAdminMode) return;
+          if (e.cancelable) e.preventDefault();
+          const p = getPos(e);
           const rect = zone.getBoundingClientRect();
           const centerX = rect.left + rect.width / 2;
           const centerY = rect.top + rect.height / 2;
-          const radians = Math.atan2(e.clientY - centerY, e.clientX - centerX);
+          const radians = Math.atan2(p.clientY - centerY, p.clientX - centerX);
           let deg = Math.round(radians * (180 / Math.PI) + 90);
           zone.style.transform = `rotate(${deg}deg)`;
-        });
+        };
+        window.addEventListener('mousemove', doRotate);
+        window.addEventListener('touchmove', doRotate, { passive: false });
 
-        window.addEventListener('mouseup', () => { isRotating = false; });
+        const stopRotate = () => { isRotating = false; };
+        window.addEventListener('mouseup', stopRotate);
+        window.addEventListener('touchend', stopRotate);
       });
     }
 
@@ -2284,7 +2317,6 @@
       const fd = new FormData(document.getElementById('ambulanceForm'));
       document.getElementById('previewOverlay').style.display = 'none';
       
-      // ★ 離線模式：沒網路就不顯示無限轉圈，而是提示快取成功
       if (!navigator.onLine) {
         window.showNotice('success', '已暫存於手機', '目前為離線狀態，您的紀錄已安全暫存，待恢復網路後系統將自動上傳！');
       } else {
