@@ -1,0 +1,2154 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <base target="_top">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, minimal-ui">
+    <title>白沙屯醫護團 - 救護紀錄表</title>
+    <!-- 截圖套件 -->
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    <!-- 傷患地圖（Leaflet + OpenStreetMap） -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <!-- 引入 LINE LIFF SDK -->
+    <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    
+    <style id="dynamicBodyStyles">
+      /* =========================================
+         基礎 CSS 樣式
+         ========================================= */
+      * { box-sizing: border-box; -webkit-user-select: none; user-select: none; }
+      html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; position: fixed; overscroll-behavior: none; -webkit-overflow-scrolling: auto; }
+      body { background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%); font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Microsoft JhengHei", sans-serif; -webkit-tap-highlight-color: transparent; color: #333; }
+      body::before { content: ''; position: fixed; top: -10%; left: -10%; width: 60%; height: 60%; background: radial-gradient(circle, rgba(214,90,104,0.15) 0%, rgba(255,255,255,0) 70%); z-index: -1; pointer-events: none; }
+      body::after { content: ''; position: fixed; bottom: -10%; right: -10%; width: 70%; height: 70%; background: radial-gradient(circle, rgba(240,131,57,0.1) 0%, rgba(255,255,255,0) 70%); z-index: -1; pointer-events: none; }
+      .app-container { position: fixed; top: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 430px; height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; overscroll-behavior: none; }
+      :root { --ssc-primary: #D65A68; --ssc-accent: #F08339; --ssc-gold: #B68D40; --glass-bg: rgba(255, 255, 255, 0.65); --glass-border: rgba(255, 255, 255, 0.8); --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07); }
+      .fixed-header { position: absolute; top: 0; left: 0; right: 0; width: 100%; flex-shrink: 0; z-index: 2000; background: rgba(255, 255, 255, 0.85); backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); border-bottom: 1px solid rgba(0,0,0,0.05); box-shadow: 0 4px 20px rgba(0,0,0,0.03); padding-top: env(safe-area-inset-top); border-bottom-left-radius: 24px; border-bottom-right-radius: 24px; }
+      .header-bar { padding: 16px 20px 8px 20px; display: flex; justify-content: space-between; align-items: flex-end; min-height: 70px; position: relative; }
+      .header-title { font-size: 24px; font-weight: 800; letter-spacing: 0.5px; background: linear-gradient(135deg, #D65A68, #F08339); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+      .header-sub { font-size: 14px; font-weight: 600; color: #888; text-align: right; }
+      .header-org-name { font-size: 10px; font-weight: 600; color: #999; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 2px; }
+      
+      .admin-top-btn { position: absolute; top: 12px; right: 16px; background: #333; color: #ffeb3b; border: 1px solid #ffeb3b; padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: bold; cursor: pointer; z-index: 2500; }
+      .admin-console-btn { position: absolute; top: 12px; right: 115px; background: #0284c7; color: #fff; border: none; padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: bold; cursor: pointer; z-index: 2500; }
+
+      .tabs { display: flex; padding: 8px 15px 12px 15px; gap: 5px; pointer-events: none; }
+      .tab-item { flex: 1; text-align: center; padding: 8px 0; font-size: 13px; font-weight: 600; color: #ccc; border-radius: 12px; transition: all 0.3s; }
+      .tab-item.active { background: #fff; color: var(--ssc-primary); box-shadow: 0 2px 8px rgba(0,0,0,0.08); transform: scale(1.02); }
+      
+      .content-scroll-area { position: absolute; top: 0; bottom: 80px; left: 0; right: 0; overflow-y: scroll; overflow-x: hidden; -webkit-overflow-scrolling: touch; padding-top: 155px; padding-bottom: 20px; }
+      .tab-content { display: none; animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+      .tab-content.active { display: block; }
+      @keyframes slideUp { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+      .section-header { color: var(--ssc-gold); font-size: 13px; font-weight: 700; margin: 25px 24px 8px 24px; letter-spacing: 0.5px; text-transform: uppercase; opacity: 0.8; }
+      .card { margin: 0 16px; background: var(--glass-bg); border-radius: 20px; box-shadow: var(--glass-shadow); border: 1px solid var(--glass-border); overflow: hidden; }
+      .row { display: flex; align-items: center; padding: 16px 20px; border-bottom: 1px solid rgba(0,0,0,0.05); min-height: 24px; }
+      .row:last-child { border-bottom: none; }
+      .label { font-size: 15px; width: 75px; font-weight: 600; color: #333; flex-shrink: 0; }
+      input[type="text"], input[type="number"], input[type="tel"] { border: none; font-size: 16px; color: #333; background: transparent; outline: none; flex-grow: 1; font-family: inherit; text-align: right; width: 100%; font-weight: 500; }
+      input::placeholder, textarea::placeholder { color: #ccc; font-weight: 400; }
+      input#caseTimeInput { color: var(--ssc-primary); font-weight: 600; opacity: 0.8; }
+      
+      .bottom-bar { position: absolute; bottom: 0; left: 0; right: 0; width: 100%; flex-shrink: 0; z-index: 2000; background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(20px); border-top: 1px solid rgba(0,0,0,0.05); padding: 15px 20px; padding-bottom: max(15px, env(safe-area-inset-bottom)); display: flex; gap: 12px; }
+      .nav-btn { flex: 1; border-radius: 16px; padding: 15px; font-size: 17px; font-weight: 600; cursor: pointer; border: none; transition: transform 0.1s; letter-spacing: 1px; }
+      .nav-btn:active { transform: scale(0.96); }
+      .btn-prev { background: #f0f0f0; color: #666; }
+      .btn-next { background: linear-gradient(135deg, #F08339 0%, #F4A674 100%); color: white; box-shadow: 0 4px 15px rgba(240, 131, 57, 0.3); }
+      .btn-submit { background: linear-gradient(135deg, #D65A68 0%, #E57E86 100%); color: white; box-shadow: 0 4px 15px rgba(214, 90, 104, 0.3); display: none; }
+
+      .gps-btn { background: #e0f2fe; color: #0284c7; border: none; border-radius: 10px; padding: 6px 10px; font-size: 13px; font-weight: 600; margin-left: 8px; flex-shrink: 0; display: flex; align-items: center; gap: 4px; transition: 0.2s; }
+      .gps-btn.success { background: #dcfce7; color: #166534; }
+
+      .row-multi { padding: 0; display: flex; }
+      .col-box { padding: 16px 10px; border-right: 1px solid rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: center; }
+      .col-box:last-child { border-right: none; }
+      .col-name { flex: 4; justify-content: flex-start; padding-left: 20px; }
+      .col-gender { flex: 2; }
+      .col-age { flex: 2; }
+      select.clean-select { font-size: 17px; color: var(--ssc-primary); border: none; background: transparent; outline: none; width: 100%; text-align: center; appearance: none; font-weight: 600; }
+      textarea.main-complaint { width: 100%; border: none; font-size: 16px; color: #333; font-family: inherit; padding: 20px; resize: none; height: 120px; outline: none; box-sizing: border-box; background: transparent; line-height: 1.5; }
+      
+      .scene-grid-container { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 0 16px; margin-bottom: 10px; }
+      .scene-item { position: relative; }
+      .scene-chip { display: flex; align-items: center; justify-content: center; background: #FFFFFF; color: #555; padding: 14px 5px; border-radius: 14px; font-size: 15px; font-weight: 500; text-align: center; width: 100%; box-shadow: 0 2px 5px rgba(0,0,0,0.05); transition: all 0.2s; border: 1.5px solid transparent; cursor: pointer; }
+      .scene-grid-container input { display: none; }
+      .scene-grid-container input:checked + .scene-chip { color: var(--ssc-primary); border: 1.5px solid var(--ssc-primary); font-weight: 600; box-shadow: 0 4px 12px rgba(214, 90, 104, 0.2); }
+      .ohca-btn { color: #D94646; font-weight: 700; }
+      .scene-grid-container input:checked + .ohca-btn { background: #FFF0F0; border-color: #D94646; }
+      
+      .upload-btn { display: inline-flex; align-items: center; justify-content: center; background: var(--ssc-primary); color: white; padding: 12px 25px; border-radius: 14px; font-size: 16px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 15px rgba(214, 90, 104, 0.3); gap: 8px; }
+      .img-preview-box { margin-top: 15px; display: none; gap: 8px; flex-wrap: wrap; justify-content: center; }
+      .img-thumb-wrap { position: relative; width: 48%; border-radius: 8px; overflow: hidden; border: 1px solid #ddd; }
+      .img-thumb-wrap img { width: 100%; height: 90px; object-fit: cover; display: block; }
+      .img-remove-btn { position: absolute; top: 4px; right: 4px; background: rgba(0,0,0,0.7); color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; }
+
+      /* =========================================
+         人體點擊圖樣式
+         ========================================= */
+      .body-map-container { position: relative; width: 100%; max-width: 380px; margin: 0 auto 20px auto; background: #fff; border-radius: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); line-height: 0; }
+      .body-map-img { width: 100%; height: auto; display: block; border-radius: 16px; }
+      .body-zone { position: absolute; cursor: pointer; transition: background 0.2s; border: 1px solid transparent; z-index: 10; border-radius: 6px; }
+      .body-zone:hover { background: rgba(214, 90, 104, 0.15); }
+      .body-zone.active { background: rgba(214, 90, 104, 0.55); border: 1.5px solid #D65A68; box-shadow: 0 0 8px rgba(214, 90, 104, 0.5); }
+      
+      .z-f-face { top: 4%; left: 22%; width: 11%; height: 10%; border-radius: 50%; }
+      .z-f-neck { top: 14%; left: 24%; width: 7%; height: 5%; }
+      .z-f-chest { top: 19%; left: 18%; width: 16%; height: 11%; }
+      .z-f-abd   { top: 31%; left: 18%; width: 16%; height: 15%; }
+      .z-f-groin { top: 52%; left: 23%; width: 8%; height: 6%; }
+      .z-f-r-arm-u { top: 21%; left: 8%;  width: 9%;  height: 12%; }
+      .z-f-r-arm-l { top: 34%; left: 8%;  width: 8%;  height: 12%; }
+      .z-f-r-hand  { top: 47%; left: 5%;  width: 8%;  height: 8%; }
+      .z-f-l-arm-u { top: 21%; left: 33%; width: 9%;  height: 12%; }
+      .z-f-l-arm-l { top: 34%; left: 37%; width: 8%;  height: 12%; }
+      .z-f-l-hand  { top: 47%; left: 36%; width: 8%;  height: 8%; }
+      .z-f-r-leg-u { top: 55%; left: 17%; width: 9%;  height: 15%; }
+      .z-f-r-leg-l { top: 70%; left: 17%; width: 8%;  height: 19%; }
+      .z-f-r-foot  { top: 90%; left: 15%; width: 9%;  height: 6%; }
+      .z-f-l-leg-u { top: 55%; left: 26%; width: 9%;  height: 15%; }
+      .z-f-l-leg-l { top: 70%; left: 27%; width: 8%;  height: 19%; }
+      .z-f-l-foot  { top: 90%; left: 27%; width: 9%;  height: 6%; }
+
+      .z-b-head { top: 4%; left: 70%; width: 10%; height: 10%; border-radius: 50%; }
+      .z-b-neck { top: 14%; left: 71%; width: 7%; height: 5%; }
+      .z-b-back-u { top: 19%; left: 67%; width: 14%; height: 11%; }
+      .z-b-back-l { top: 31%; left: 67%; width: 14%; height: 10%; }
+      .z-b-butt   { top: 44%; left: 67%; width: 14%; height: 9%; }
+      .z-b-l-arm-u { top: 21%; left: 58%; width: 9%;  height: 12%; }
+      .z-b-l-arm-l { top: 34%; left: 57%; width: 8%;  height: 12%; }
+      .z-b-l-hand  { top: 47%; left: 55%; width: 8%;  height: 8%; }
+      .z-b-r-arm-u { top: 21%; left: 83%; width: 9%;  height: 12%; }
+      .z-b-r-arm-l { top: 34%; left: 85%; width: 8%;  height: 12%; }
+      .z-b-r-hand  { top: 47%; left: 88%; width: 8%;  height: 8%; }
+      .z-b-l-leg-u { top: 55%; left: 66%; width: 8%;  height: 15%; }
+      .z-b-l-leg-l { top: 70%; left: 66%; width: 8%;  height: 19%; }
+      .z-b-l-foot  { top: 90%; left: 65%; width: 9%;  height: 6%; }
+      .z-b-r-leg-u { top: 55%; left: 75%; width: 8%;  height: 15%; }
+      .z-b-r-leg-l { top: 70%; left: 75%; width: 8%;  height: 19%; }
+      .z-b-r-foot  { top: 90%; left: 76%; width: 9%;  height: 6%; }
+
+      #selectedBodyParts { text-align: left; font-size: 14px; color: var(--ssc-primary); min-height: 24px; margin: 15px 16px 20px 16px; padding: 15px; background: rgba(255,255,255,0.7); border-radius: 12px; line-height: 1.6; border: 1px dashed rgba(214, 90, 104, 0.4); }
+      .injury-item-row { border-bottom: 1px solid rgba(0,0,0,0.05); padding: 4px 0; font-family: monospace; }
+      .injury-item-row:last-child { border-bottom: none; }
+
+      /* 管理員樣式 */
+      .admin-mode-bar { display: none; position: fixed; bottom: 85px; left: 10px; right: 10px; background: rgba(0,0,0,0.9); color: #fff; padding: 12px 15px; border-radius: 16px; z-index: 4000; justify-content: space-between; align-items: center; font-size: 13px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+      .admin-mode-bar.active { display: flex; flex-direction: column; gap: 8px; }
+      .admin-btns-group { display: flex; gap: 6px; width: 100%; justify-content: space-between; }
+      .admin-btn { background: #D65A68; color: white; border: none; padding: 8px 12px; border-radius: 8px; font-weight: bold; cursor: pointer; flex: 1; font-size: 12px; }
+      .admin-editing .body-zone { border: 1px dashed #ffeb3b !important; background: rgba(255, 235, 59, 0.25) !important; cursor: move !important; }
+      .admin-editing .body-zone.selected-admin { border: 2px solid #00e676 !important; background: rgba(0, 230, 118, 0.4) !important; z-index: 100 !important; }
+      
+      .resize-handle { display: none; position: absolute; width: 12px; height: 12px; background: #00e676; border: 2px solid #fff; border-radius: 50%; z-index: 101; }
+      .selected-admin .resize-handle { display: block; }
+      .handle-tl { top: -6px; left: -6px; cursor: nwse-resize; }
+      .handle-tr { top: -6px; right: -6px; cursor: nesw-resize; }
+      .handle-bl { bottom: -6px; left: -6px; cursor: nesw-resize; }
+      .handle-br { bottom: -6px; right: -6px; cursor: nwse-resize; }
+      
+      .rotate-handle { display: none; position: absolute; top: -25px; left: 50%; transform: translateX(-50%); width: 14px; height: 14px; background: #ff9800; border: 2px solid #fff; border-radius: 50%; z-index: 102; cursor: grab; }
+      .selected-admin .rotate-handle { display: block; }
+      .rotate-line { display: none; position: absolute; top: -25px; left: 50%; width: 2px; height: 25px; background: #ff9800; z-index: 101; }
+      .selected-admin .rotate-line { display: block; }
+
+      /* =========================================
+         ★ 預覽彈窗 (z-index: 8000) ★
+         ========================================= */
+      #previewOverlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 8000; align-items: center; justify-content: center; padding: 6px; }
+      .preview-card { background: #fff; width: 100%; max-width: 410px; max-height: 96vh; border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 25px 50px rgba(0,0,0,0.3); }
+      .preview-scroll-wrapper { overflow-y: auto; padding: 12px 14px; flex: 1; }
+      
+      .report-header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #D65A68; padding-bottom: 6px; margin-bottom: 8px; }
+      .report-title { font-size: 14px; font-weight: 800; color: #D65A68; }
+      .report-subtitle { font-size: 8px; color: #888; }
+      .report-top-meta { text-align: right; font-size: 11px; font-weight: 700; color: #444; line-height: 1.3; }
+
+      .report-section-title { font-size: 11px; font-weight: 700; color: #B68D40; background: #fdfaf6; border-left: 3px solid #B68D40; padding: 2px 6px; margin: 8px 0 4px 0; text-transform: uppercase; }
+      .report-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 12px; color: #333; }
+      .report-grid-full { grid-column: span 2; }
+      .report-item { background: #f9f9f9; padding: 5px 8px; border-radius: 6px; border: 1px solid #eee; }
+      .report-item span { color: #666; font-size: 10px; display: block; }
+      .report-item b { font-size: 12px; color: #222; }
+
+      .preview-body-container { position: relative; width: 100px; margin: 2px auto; background: #fff; border-radius: 6px; border: 1px solid #ddd; line-height: 0; }
+      .preview-body-img { width: 100%; height: auto; display: block; border-radius: 6px; opacity: 0.9; }
+      .preview-dot { position: absolute; width: 8px; height: 8px; background: #D65A68; border: 1px solid #fff; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 4px #D65A68; }
+
+      .preview-photos-grid { display: flex; gap: 6px; justify-content: center; margin-top: 4px; }
+      .preview-photo { width: 48%; max-height: 90px; object-fit: cover; border-radius: 6px; border: 1px solid #ddd; }
+
+      .preview-btns { display: flex; height: 50px; border-top: 1px solid #eee; background: #fff; }
+      .p-btn { flex: 1; border: none; font-size: 15px; font-weight: 700; background: #fff; color: #555; cursor: pointer; }
+      .p-btn-ok { background: linear-gradient(135deg, #4CAF50, #45a049); color: #fff; font-size: 16px; }
+
+      /* =========================================
+         ★ 管理員主控台 (z-index: 5000) ★
+         ========================================= */
+      #adminConsoleOverlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 5000; align-items: center; justify-content: center; padding: 6px; }
+      .console-card { background: #fff; width: 100%; max-width: 410px; height: 96vh; border-radius: 16px; display: flex; flex-direction: column; overflow: hidden; }
+      .console-header { background: #0284c7; color: #fff; padding: 12px 15px; font-size: 15px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+      
+      .console-tabs { display: flex; background: #e0f2fe; border-bottom: 1px solid #bae6fd; }
+      .console-tab { flex: 1; text-align: center; padding: 8px 0; font-size: 13px; font-weight: bold; color: #0369a1; cursor: pointer; border-bottom: 2px solid transparent; }
+      .console-tab.active { background: #fff; color: #0284c7; border-bottom: 2px solid #0284c7; }
+
+      .console-panel { display: none; flex: 1; overflow-y: auto; background: #f8fafc; padding: 8px; flex-direction: column; }
+      .console-panel.active { display: flex; }
+
+      /* 日期左右切換導覽列 */
+      .date-nav-bar { display: flex; justify-content: space-between; align-items: center; background: #e2e8f0; padding: 6px 10px; border-radius: 6px; margin-bottom: 6px; font-size: 12px; font-weight: bold; color: #334155; }
+      .date-nav-btn { background: #0284c7; color: #fff; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; }
+
+      .console-filter-bar { padding: 4px 0 8px 0; display: flex; gap: 6px; }
+      .console-filter-bar input, .console-filter-bar select { flex: 1; padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px; outline: none; }
+      
+      .console-row-item { background: #fff; border-radius: 8px; padding: 8px 12px; margin-bottom: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: 0.1s; }
+      .console-row-item:active { background: #f1f5f9; }
+      .console-row-left { font-size: 12px; line-height: 1.4; color: #334155; }
+      .console-row-right { text-align: right; font-size: 11px; color: #64748b; flex-shrink: 0; }
+
+      /* 數據分析儀表板 (支援可收合分類) */
+      .stats-card { background: #fff; border-radius: 12px; padding: 14px; margin-bottom: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; }
+      .stats-card-title { font-size: 13px; font-weight: bold; color: #0284c7; margin-bottom: 10px; border-bottom: 1px solid #f1f5f9; padding-bottom: 4px; }
+      
+      .chart-category-box { margin-bottom: 8px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; background: #fff; }
+      .chart-main-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; font-size: 12px; font-weight: bold; color: #1e293b; background: #f8fafc; cursor: pointer; }
+      .chart-main-header:hover { background: #f1f5f9; }
+      .chart-bar-bg { background: #e2e8f0; height: 6px; border-radius: 3px; overflow: hidden; margin: 0 10px 8px 10px; }
+      .chart-bar-fill { background: linear-gradient(135deg, #0284c7, #38bdf8); height: 100%; border-radius: 3px; }
+      
+      .sub-item-container { display: none; padding: 6px 10px 10px 10px; background: #fff; border-top: 1px solid #f1f5f9; font-size: 11px; color: #475569; }
+      .sub-item-container.expanded { display: block; }
+      .sub-item-row { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px dashed #f1f5f9; }
+
+      /* 彈窗樣式 */
+      .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(5px); z-index: 3000; align-items: center; justify-content: center; }
+      .modal-card { background: white; width: 85%; max-width: 320px; border-radius: 24px; padding: 25px; box-shadow: 0 20px 40px rgba(0,0,0,0.2); }
+      .modal-title { font-size: 18px; font-weight: 800; color: var(--ssc-primary); margin-bottom: 15px; text-align: center; }
+      .modal-row { margin-bottom: 15px; }
+      .modal-row label { display: block; font-size: 13px; color: #888; margin-bottom: 5px; font-weight: 600; }
+      .modal-select, .modal-input { width: 100%; padding: 12px; border-radius: 12px; border: 1px solid #eee; background: #f9f9f9; font-size: 16px; outline: none; box-sizing: border-box; }
+      .modal-input-group { display: flex; align-items: center; gap: 8px; }
+      .modal-input-group input { flex: 1; }
+      .modal-btns { display: flex; gap: 10px; margin-top: 20px; }
+      .modal-btn { flex: 1; padding: 12px; border-radius: 12px; border: none; font-weight: 600; font-size: 15px; cursor: pointer; }
+      .btn-confirm { background: var(--ssc-primary); color: white; }
+      .btn-cancel { background: #eee; color: #666; }
+      #loading { background: rgba(0,0,0,0.5); backdrop-filter: blur(5px); display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 9999; justify-content: center; align-items: center; color: #fff; font-size: 18px; }
+    </style>
+
+    <!-- ★ 新增樣式（不動上方既有樣式）：主控台列表時間不被裁切、編輯模式列、統計收合箭頭 ★ -->
+    <style id="addonStyles">
+      .console-row-item { gap: 8px; }
+      .console-row-left { min-width: 0; flex: 1; word-break: break-all; }
+      .console-row-right { white-space: nowrap; min-width: 76px; line-height: 1.6; }
+      .console-row-time { font-size: 13px; font-weight: bold; color: #0369a1; }
+
+      .edit-mode-bar { display: none; position: fixed; bottom: 85px; left: 10px; right: 10px; max-width: 410px; margin: 0 auto; background: rgba(2,132,199,0.96); color: #fff; padding: 10px 12px; border-radius: 16px; z-index: 4000; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; font-weight: bold; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+      .edit-mode-bar.active { display: flex; }
+      .edit-mode-bar button { border: none; border-radius: 8px; padding: 8px 12px; font-size: 12px; font-weight: bold; cursor: pointer; flex-shrink: 0; }
+      .edit-del-btn { background: #ef4444; color: #fff; }
+      .edit-cancel-btn { background: #fff; color: #0284c7; }
+
+      .stats-toolbar { display: flex; justify-content: flex-end; gap: 6px; margin-bottom: 8px; }
+      .stats-toolbar button { background: #e0f2fe; color: #0284c7; border: none; border-radius: 6px; padding: 5px 10px; font-size: 11px; font-weight: bold; cursor: pointer; }
+      .chart-arrow { display: inline-block; transition: transform 0.2s; }
+      .chart-category-box.open .chart-arrow { transform: rotate(180deg); }
+      .sub-item-row { font-size: 12px; padding: 6px 0; }
+
+      /* 案件清單檢視模式：條列 / 小圖 / 中圖 / 大圖 */
+      .view-mode-bar { display: flex; gap: 6px; padding: 0 0 6px 0; }
+      .view-mode-bar button { flex: 1; border: 1px solid #bae6fd; background: #fff; color: #0369a1; border-radius: 6px; padding: 6px 0; font-size: 12px; font-weight: bold; cursor: pointer; }
+      .view-mode-bar button.active { background: #0284c7; color: #fff; border-color: #0284c7; }
+      .view-grid { display: grid; gap: 8px; align-content: start; grid-auto-rows: max-content; }
+      .view-small { grid-template-columns: repeat(3, 1fr); }
+      .view-medium { grid-template-columns: repeat(2, 1fr); }
+      .view-large { grid-template-columns: 1fr; }
+      .cc-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.05); min-width: 0; }
+      .cc-card:active { background: #f1f5f9; }
+      .cc-thumb { width: 100%; background: #f1f5f9; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+            .cc-thumb { background: #fff; }
+      .cc-map { position: relative; height: 100%; line-height: 0; }
+      .cc-map img { height: 100%; width: auto; display: block; }
+      .cc-map .preview-dot { width: 7px; height: 7px; }
+      .view-large .cc-map .preview-dot { width: 11px; height: 11px; }
+      .cc-card { flex-shrink: 0; }
+      .cc-mid, .cc-extra { display: none; }
+      .view-medium .cc-mid, .view-large .cc-mid { display: inline; }
+      .view-large .cc-extra { display: block; margin-top: 4px; padding-top: 4px; border-top: 1px dashed #e2e8f0; }
+      .cc-noimg { font-size: 28px; opacity: 0.35; }
+      .cc-body { padding: 6px 8px; line-height: 1.4; color: #334155; word-break: break-all; }
+      .cc-problem { color: #D65A68; font-weight: bold; }
+      .cc-meta { color: #0369a1; font-weight: bold; }
+      .cc-addr { color: #64748b; }
+      .view-small .cc-thumb { height: 70px; }
+      .view-small .cc-body { font-size: 10px; padding: 4px 5px; }
+      .view-small .cc-armband, .view-small .cc-addr { display: none; }
+      .view-medium .cc-thumb { height: 150px; }
+      .view-medium .cc-body { font-size: 11px; }
+      .view-large .cc-thumb { height: 260px; }
+      .view-large .cc-body { font-size: 13px; padding: 8px 10px; }
+
+      /* 自訂完成/錯誤提示（取代瀏覽器內建 alert） */
+      .notice-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.45); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); z-index: 9500; align-items: center; justify-content: center; }
+      .notice-card { background: #fff; width: 80%; max-width: 300px; border-radius: 24px; padding: 28px 22px 20px 22px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.25); animation: noticePop 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
+      @keyframes noticePop { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: scale(1); } }
+      .notice-icon { width: 56px; height: 56px; border-radius: 50%; margin: 0 auto 12px auto; display: flex; align-items: center; justify-content: center; font-size: 28px; background: #dcfce7; color: #166534; }
+      .notice-card.error .notice-icon { background: #fee2e2; color: #b91c1c; }
+      .notice-card.info .notice-icon { background: #e0f2fe; color: #0284c7; }
+      .notice-title { font-size: 18px; font-weight: 800; color: #333; margin-bottom: 6px; }
+      .notice-msg { font-size: 14px; color: #666; line-height: 1.5; word-break: break-all; }
+      .notice-btn { margin-top: 18px; width: 100%; border: none; border-radius: 14px; padding: 12px; font-size: 16px; font-weight: 600; color: #fff; background: linear-gradient(135deg, #D65A68 0%, #E57E86 100%); cursor: pointer; }
+      .notice-card.success .notice-btn { background: linear-gradient(135deg, #4CAF50, #45a049); }
+      .notice-msg { white-space: pre-line; text-align: left; }
+      .notice-card.success .notice-msg, .notice-card.error .notice-msg { text-align: center; }
+      .notice-btns { display: flex; gap: 10px; margin-top: 18px; }
+      .notice-btns .notice-btn { margin-top: 0; }
+      .notice-btn.secondary { background: #eee !important; color: #666; }
+      .notice-btn.danger { background: linear-gradient(135deg, #ef4444, #f87171) !important; }
+
+      /* 傷患總地圖分頁 */
+      #panel-map { overflow: hidden; padding: 6px; }
+      #bigMap { flex: 1; min-height: 300px; border-radius: 8px; margin-top: 6px; z-index: 0; }
+      .map-legend { display: flex; flex-wrap: wrap; gap: 4px 10px; padding: 6px 4px 0 4px; font-size: 10px; color: #475569; }
+      .map-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 3px; vertical-align: middle; }
+      .leaflet-popup-content { font-size: 12px; line-height: 1.5; margin: 10px 12px; }
+
+      /* 地點地圖 */
+      .map-embed-wrap { line-height: 1.4; }
+      .map-embed-wrap iframe { width: 100%; border: 0; border-radius: 8px; display: block; background: #f1f5f9; }
+      .map-open-link { display: block; text-align: right; font-size: 11px; color: #0284c7; margin-top: 4px; text-decoration: none; font-weight: bold; }
+      .map-none { font-size: 10px; color: #888; }
+      .cc-pane-loc { display: none; width: 100%; height: 100%; flex-direction: column; padding: 4px; background: #fff; }
+      .cc-pane-loc .map-embed-wrap { height: 100%; display: flex; flex-direction: column; }
+      .cc-pane-loc iframe { flex: 1; min-height: 0; }
+      .cc-thumb.show-loc .cc-map { display: none; }
+      .cc-thumb.show-loc .cc-pane-loc { display: flex; }
+
+      /* 必填未填紅框 */
+      .field-error { outline: 2px solid #ef4444; outline-offset: -2px; border-radius: 14px; background-color: rgba(254, 226, 226, 0.45) !important; animation: errShake 0.3s; }
+      .scene-grid-container.field-error { padding-top: 8px; padding-bottom: 8px; }
+      @keyframes errShake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+
+      /* 大圖：傷情圖 / 現場照片 切換 */
+      .cc-media-tabs { display: flex; gap: 6px; padding: 6px 8px 0 8px; background: #fff; }
+      .cc-media-tabs button { flex: 1; border: 1px solid #bae6fd; background: #fff; color: #0369a1; border-radius: 6px; padding: 5px 0; font-size: 12px; font-weight: bold; cursor: pointer; }
+      .cc-media-tabs button.active { background: #0284c7; color: #fff; border-color: #0284c7; }
+      .cc-pane-photo { display: none; width: 100%; height: 100%; gap: 4px; padding: 4px; background: #f1f5f9; }
+      .cc-pane-photo img { flex: 1; min-width: 0; height: 100%; object-fit: cover; border-radius: 8px; display: block; }
+      .cc-nophoto { width: 100%; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 14px; }
+      .cc-thumb.show-photo .cc-map { display: none; }
+      .cc-thumb.show-photo .cc-pane-photo { display: flex; }
+    </style>
+  </head>
+  <body>
+
+  <div class="app-container">
+
+    <div class="fixed-header">
+      <div class="header-bar">
+        <button type="button" class="admin-console-btn" onclick="window.openAdminConsole()">📊 主控台</button>
+        <button type="button" class="admin-top-btn" onclick="window.toggleAdminMode()">⚙️ 管理員調整</button>
+        <div>
+          <div class="header-org-name">白沙屯醫護團 (FIREBASE 版)</div>
+          <div class="header-title">救護紀錄表</div>
+        </div>
+        <div class="header-sub" id="headerTime">--:--</div>
+      </div>
+      <div class="tabs">
+        <div class="tab-item active" id="tabHead-basic">基本資料</div>
+        <div class="tab-item" id="tabHead-scene">現場狀況</div>
+        <div class="tab-item" id="tabHead-treatment">急救處置</div>
+        <div class="tab-item" id="tabHead-vitals">後續交班</div>
+      </div>
+    </div>
+
+    <div class="content-scroll-area">
+      <form id="ambulanceForm" onsubmit="event.preventDefault();">
+        
+        <!-- ================= TAB 1: 基本資料 ================= -->
+        <div id="tab-basic" class="tab-content active">
+          <div class="section-header">案件資料</div>
+          <div class="card">
+            <div class="row">
+              <div class="label">時間</div>
+              <input type="text" name="caseTime" id="caseTimeInput" readonly>
+            </div>
+            <div class="row">
+              <div class="label">人員</div>
+              <input type="text" name="personnel" id="personnelInput" placeholder="系統自動帶入中...">
+            </div>
+            <div class="row" style="padding-right:10px;">
+              <div class="label">地點</div>
+              <input type="text" name="location" placeholder="發生地址 (或地標)">
+              <button type="button" class="gps-btn" id="gpsBtn" onclick="window.getGPS()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>定位
+              </button>
+            </div>
+            <input type="hidden" name="gps_lat" id="gps_lat">
+            <input type="hidden" name="gps_lng" id="gps_lng">
+            <div id="gpsMapPreview" style="display:none; padding:0 14px 14px 14px;"></div>
+          </div>
+
+          <div class="section-header">病患資料</div>
+          <div class="card">
+            <div class="row row-multi">
+              <div class="col-box col-name">
+                <input type="text" name="pName" placeholder="患者姓名">
+              </div>
+              <div class="col-box col-gender">
+                <select name="gender" class="clean-select">
+                  <option value="男">男</option>
+                  <option value="女">女</option>
+                  <option value="不詳">?</option>
+                </select>
+              </div>
+              <div class="col-box col-age">
+                <input type="number" name="age" placeholder="歲">
+              </div>
+            </div>
+            <div class="row">
+              <div class="label">臂章編號</div>
+              <input type="text" name="armband" placeholder="香燈腳臂章 (無則免填)">
+            </div>
+            <div class="row">
+              <div class="label">電話</div>
+              <input type="tel" name="pPhone" placeholder="09xx...">
+            </div>
+          </div>
+        </div>
+
+        <!-- ================= TAB 2: 現場狀況 ================= -->
+        <div id="tab-scene" class="tab-content">
+          <div class="section-header">問題類型 (可複選)</div>
+          <div class="scene-grid-container">
+            <div class="scene-item"><label><input type="checkbox" name="problems" value="起水泡問題"><div class="scene-chip">起水泡問題</div></label></div>
+            <div class="scene-item"><label><input type="checkbox" name="problems" value="抽筋/痠痛"><div class="scene-chip">抽筋/痠痛</div></label></div>
+            <div class="scene-item"><label><input type="checkbox" name="problems" value="跌倒/擦摔"><div class="scene-chip">跌倒/擦摔</div></label></div>
+            <div class="scene-item"><label><input type="checkbox" name="problems" value="車禍"><div class="scene-chip">車禍</div></label></div>
+            <div class="scene-item"><label><input type="checkbox" name="problems" value="冷熱急症"><div class="scene-chip">冷熱急症</div></label></div>
+            <div class="scene-item"><label><input type="checkbox" name="problems" value="頭暈/想吐"><div class="scene-chip">頭暈/想吐</div></label></div>
+            <div class="scene-item"><label><input type="checkbox" name="problems" value="肢體無力"><div class="scene-chip">肢體無力</div></label></div>
+            <div class="scene-item"><label><input type="checkbox" name="problems" value="疑似中風"><div class="scene-chip">疑似中風</div></label></div>
+            <div class="scene-item"><label><input type="checkbox" name="problems" value="心臟不適"><div class="scene-chip">心臟不適</div></label></div>
+            <div class="scene-item"><label><input type="checkbox" name="problems" value="OHCA"><div class="scene-chip ohca-btn">OHCA</div></label></div>
+            
+            <div class="scene-item" style="grid-column: span 2;">
+              <label>
+                <input type="checkbox" name="problems" value="其他" id="problemOtherCheckbox" onclick="window.openGenericModal(this, 'problemOtherLabel', 'problemOtherValue', '填寫其他現場狀況', '例如: 打架、咬傷、生理期等...')">
+                <div class="scene-chip" id="problemOtherLabel">其他 (打架/咬傷/生理期等...)</div>
+              </label>
+            </div>
+          </div>
+          <input type="hidden" id="problemOtherValue" value="">
+          
+          <div class="section-header">主訴描述</div>
+          <div class="card">
+            <textarea name="mainComplaint" class="main-complaint" placeholder="描述患者不舒服的狀況、部位或傷口大小..."></textarea>
+          </div>
+        </div>
+
+        <!-- ================= TAB 3: 急救處置 ================= -->
+        <div id="tab-treatment" class="tab-content">
+          
+          <div class="section-header">受傷部位 (點擊圖示標記)</div>
+          <div class="body-map-container" id="bodyMapContainer">
+            <img src="https://i.ibb.co/6JFnSZp7/image.jpg" class="body-map-img" alt="body chart">
+            
+            <!-- 正面 -->
+            <div class="body-zone z-f-face" data-part="正面-臉部" onclick="window.toggleBodyPart(this, '正面-臉部')"></div>
+            <div class="body-zone z-f-neck" data-part="正面-脖子" onclick="window.toggleBodyPart(this, '正面-脖子')"></div>
+            <div class="body-zone z-f-chest" data-part="正面-胸口" onclick="window.toggleBodyPart(this, '正面-胸口')"></div>
+            <div class="body-zone z-f-abd" data-part="正面-肚子" onclick="window.toggleBodyPart(this, '正面-肚子')"></div>
+            <div class="body-zone z-f-groin" data-part="正面-會陰" onclick="window.toggleBodyPart(this, '正面-會陰')"></div>
+            <div class="body-zone z-f-r-arm-u" data-part="正面-右上臂" onclick="window.toggleBodyPart(this, '正面-右上臂')"></div>
+            <div class="body-zone z-f-r-arm-l" data-part="正面-右下臂" onclick="window.toggleBodyPart(this, '正面-右下臂')"></div>
+            <div class="body-zone z-f-r-hand" data-part="正面-右手掌" onclick="window.toggleBodyPart(this, '正面-右手掌')"></div>
+            <div class="body-zone z-f-l-arm-u" data-part="正面-左上臂" onclick="window.toggleBodyPart(this, '正面-左上臂')"></div>
+            <div class="body-zone z-f-l-arm-l" data-part="正面-左下臂" onclick="window.toggleBodyPart(this, '正面-左下臂')"></div>
+            <div class="body-zone z-f-l-hand" data-part="正面-左手掌" onclick="window.toggleBodyPart(this, '正面-左手掌')"></div>
+            <div class="body-zone z-f-r-leg-u" data-part="正面-右大腿" onclick="window.toggleBodyPart(this, '正面-右大腿')"></div>
+            <div class="body-zone z-f-r-leg-l" data-part="正面-右小腿" onclick="window.toggleBodyPart(this, '正面-右小腿')"></div>
+            <div class="body-zone z-f-r-foot" data-part="正面-右腳掌" onclick="window.toggleBodyPart(this, '正面-右腳掌')"></div>
+            <div class="body-zone z-f-l-leg-u" data-part="正面-左大腿" onclick="window.toggleBodyPart(this, '正面-左大腿')"></div>
+            <div class="body-zone z-f-l-leg-l" data-part="正面-左小腿" onclick="window.toggleBodyPart(this, '正面-左小腿')"></div>
+            <div class="body-zone z-f-l-foot" data-part="正面-左腳掌" onclick="window.toggleBodyPart(this, '正面-左腳掌')"></div>
+            
+            <!-- 背面 -->
+            <div class="body-zone z-b-head" data-part="背面-頭部" onclick="window.toggleBodyPart(this, '背面-頭部')"></div>
+            <div class="body-zone z-b-neck" data-part="背面-脖子" onclick="window.toggleBodyPart(this, '背面-脖子')"></div>
+            <div class="body-zone z-b-back-u" data-part="背面-上背" onclick="window.toggleBodyPart(this, '背面-上背')"></div>
+            <div class="body-zone z-b-back-l" data-part="背面-下背" onclick="window.toggleBodyPart(this, '背面-下背')"></div>
+            <div class="body-zone z-b-butt" data-part="背面-屁股" onclick="window.toggleBodyPart(this, '背面-屁股')"></div>
+            <div class="body-zone z-b-l-arm-u" data-part="背面-左上臂" onclick="window.toggleBodyPart(this, '背面-左上臂')"></div>
+            <div class="body-zone z-b-l-arm-l" data-part="背面-左下臂" onclick="window.toggleBodyPart(this, '背面-左下臂')"></div>
+            <div class="body-zone z-b-l-hand" data-part="背面-左手掌" onclick="window.toggleBodyPart(this, '背面-左手掌')"></div>
+            <div class="body-zone z-b-r-arm-u" data-part="背面-右上臂" onclick="window.toggleBodyPart(this, '背面-右上臂')"></div>
+            <div class="body-zone z-b-r-arm-l" data-part="背面-右下臂" onclick="window.toggleBodyPart(this, '背面-右下臂')"></div>
+            <div class="body-zone z-b-r-hand" data-part="背面-右手掌" onclick="window.toggleBodyPart(this, '背面-右手掌')"></div>
+            <div class="body-zone z-b-l-leg-u" data-part="背面-左大腿" onclick="window.toggleBodyPart(this, '背面-左大腿')"></div>
+            <div class="body-zone z-b-l-leg-l" data-part="背面-左小腿" onclick="window.toggleBodyPart(this, '背面-左小腿')"></div>
+            <div class="body-zone z-b-l-foot" data-part="背面-左腳掌" onclick="window.toggleBodyPart(this, '背面-左腳掌')"></div>
+            <div class="body-zone z-b-r-leg-u" data-part="背面-右大腿" onclick="window.toggleBodyPart(this, '背面-右大腿')"></div>
+            <div class="body-zone z-b-r-leg-l" data-part="背面-右小腿" onclick="window.toggleBodyPart(this, '背面-右小腿')"></div>
+            <div class="body-zone z-b-r-foot" data-part="背面-右腳掌" onclick="window.toggleBodyPart(this, '背面-右腳掌')"></div>
+          </div>
+          <div id="selectedBodyParts">尚無標記</div>
+
+          <div class="section-header">處置項目</div>
+          <div class="scene-grid-container">
+            <div class="scene-item"><label><input type="checkbox" name="treatment" value="清洗傷口"><div class="scene-chip">清洗/消毒傷口</div></label></div>
+            <div class="scene-item"><label><input type="checkbox" name="treatment" value="水泡處理"><div class="scene-chip">水泡引流/包紮</div></label></div>
+            <div class="scene-item"><label><input type="checkbox" name="treatment" value="止血包紮"><div class="scene-chip">一般止血包紮</div></label></div>
+            <div class="scene-item"><label><input type="checkbox" name="treatment" value="冰敷降溫"><div class="scene-chip">冰敷/協助降溫</div></label></div>
+            <div class="scene-item"><label><input type="checkbox" name="treatment" value="肌肉伸展"><div class="scene-chip">拉筋/伸展放鬆</div></label></div>
+            <div class="scene-item"><label><input type="checkbox" name="treatment" value="心理支持"><div class="scene-chip">心理支持</div></label></div>
+            <div class="scene-item"><label><input type="checkbox" name="treatment" value="夾板固定"><div class="scene-chip">骨折/夾板固定</div></label></div>
+            <div class="scene-item"><label><input type="checkbox" name="treatment" value="給予鹽糖"><div class="scene-chip">給予水分/鹽糖</div></label></div>
+            <div class="scene-item"><label><input type="checkbox" name="treatment" value="建議就醫"><div class="scene-chip" style="color:#D65A68;">建議後送就醫</div></label></div>
+            <div class="scene-item"><label><input type="checkbox" name="treatment" value="CPR"><div class="scene-chip ohca-btn">CPR</div></label></div>
+            
+            <div class="scene-item" style="grid-column: span 2;">
+              <label>
+                <input type="checkbox" name="treatment" value="其他" id="treatmentOtherCheckbox" onclick="window.openGenericModal(this, 'treatmentOtherLabel', 'treatmentOtherValue', '填寫其他處置方式', '例如: 給予氧氣、量測血糖...')">
+                <div class="scene-chip" id="treatmentOtherLabel">其他處置 (點擊輸入)</div>
+              </label>
+            </div>
+          </div>
+          <input type="hidden" id="treatmentOtherValue" value="">
+        </div>
+
+        <!-- ================= TAB 4: 後續交班 ================= -->
+        <div id="tab-vitals" class="tab-content">
+          
+          <div class="section-header">處置後生命徵象</div>
+          <div class="scene-grid-container" style="grid-template-columns: 1fr;"> 
+            <div class="scene-item">
+              <label>
+                <input type="radio" name="postVitals" value="意識清楚生命徵象穩定" checked onclick="window.clearVitalsOther()">
+                <div class="scene-chip">意識清楚生命徵象穩定</div>
+              </label>
+            </div>
+            <div class="scene-item">
+              <label>
+                <input type="radio" name="postVitals" value="其他" id="vitalsOtherRadio" onclick="window.promptVitalsOther()">
+                <div class="scene-chip" id="vitalsOtherLabel">其他 (點擊輸入異常數值)</div>
+              </label>
+            </div>
+          </div>
+          <input type="hidden" id="postVitalsOtherText" value="">
+
+          <div class="section-header">處理團員 / 接手單位資訊</div>
+          <div class="card">
+            <textarea name="handoverInfo" class="main-complaint" style="height:90px;" placeholder="例：由團員楊小馬處理完成 / 或 XX醫院91接手"></textarea>
+          </div>
+
+          <div class="section-header">現場照片上傳 (選填，最多 2 張)</div>
+          <div class="card" style="padding: 20px; text-align:center; margin-bottom: 30px;">
+            <label for="imageUpload" class="upload-btn">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+              拍照 / 選擇照片 (最多2張)
+            </label>
+            <input type="file" id="imageUpload" accept="image/*" capture="environment" multiple style="display:none;" onchange="window.handleImageUpload(event)">
+            
+            <div id="imagePreviewContainer" class="img-preview-box"></div>
+            <p style="font-size:11px; color:#999; margin-top:12px;">※ 系統會自動壓縮照片以節省網路流量</p>
+          </div>
+
+        </div>
+      </form>
+    </div>
+
+    <!-- 管理員即時控制板 -->
+    <div id="adminModeBar" class="admin-mode-bar">
+      <div id="adminStatusText" style="font-family: monospace; color: #ffeb3b; font-weight: bold; font-size: 11px;">點擊區塊：四角縮放、頂端橘點旋轉</div>
+      <div class="admin-btns-group">
+        <button class="admin-btn" style="background:#2196F3;" onclick="window.saveBodyConfigToFirebase()">💾 儲存並同步至資料庫</button>
+        <button class="admin-btn" style="background:#757575;" onclick="window.toggleAdminMode()">關閉模式</button>
+      </div>
+    </div>
+
+    <!-- ★ 新增：編輯紀錄模式列（編輯中才會出現，內含刪除 / 取消編輯） ★ -->
+    <div id="editModeBar" class="edit-mode-bar">
+      <span id="editModeText">✏️ 編輯中</span>
+      <div style="display:flex; gap:6px;">
+        <button type="button" class="edit-del-btn" onclick="window.deleteEditingRecord()">🗑 刪除此紀錄</button>
+        <button type="button" class="edit-cancel-btn" onclick="window.cancelEdit()">取消編輯</button>
+      </div>
+    </div>
+
+    <div class="bottom-bar">
+      <button type="button" class="nav-btn btn-prev" id="prevBtn" onclick="window.prevStep()" style="display:none;">上一步</button>
+      <button type="button" class="nav-btn btn-next" id="nextBtn" onclick="window.nextStep()">下一步</button>
+      <button type="button" class="nav-btn btn-submit" id="submitBtn" onclick="window.showPreview()">確認上傳</button>
+    </div>
+  </div>
+
+  <!-- 共用文字輸入彈窗 -->
+  <div id="genericTextModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-title" id="genericModalTitle">輸入自訂內容</div>
+      <div class="modal-row">
+        <input type="text" id="genericModalInput" class="modal-input" placeholder="...">
+      </div>
+      <div class="modal-btns">
+        <button class="modal-btn btn-cancel" onclick="window.closeGenericModal()">取消</button>
+        <button class="modal-btn btn-confirm" onclick="window.confirmGenericModal()">確認</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 傷情部位彈窗 -->
+  <div id="injuryModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-title" id="modalPartName">部位名稱</div>
+      <div class="modal-row">
+        <label>傷情類型</label>
+        <select id="injuryType" class="modal-select" onchange="window.updateModalInput()">
+          <option value="起水泡">起水泡</option>
+          <option value="擦傷/破皮">擦傷 / 破皮</option>
+          <option value="抽筋/痠痛">抽筋 / 痠痛</option>
+          <option value="扭傷/拉傷">扭傷 / 拉傷</option>
+          <option value="撕裂傷/割傷">撕裂傷 / 割傷</option>
+          <option value="燒燙傷/炸傷">燒燙傷 / 炸傷</option>
+          <option value="紅腫/瘀青">紅腫 / 瘀青</option>
+          <option value="骨折疑慮">骨折疑慮</option>
+          <option value="其他">其他 (自行輸入)</option>
+        </select>
+      </div>
+      <div id="inputAreaArea" class="modal-row">
+        <label>面積 (公分 X 公分)</label>
+        <div class="modal-input-group"><input type="number" id="areaW" class="modal-input" placeholder="長"><span>X</span><input type="number" id="areaH" class="modal-input" placeholder="寬"></div>
+      </div>
+      <div id="inputLengthArea" class="modal-row" style="display:none;">
+        <label>長度 (公分)</label>
+        <input type="number" id="injuryLen" class="modal-input" placeholder="長度">
+      </div>
+      <div id="inputOtherArea" class="modal-row" style="display:none;">
+        <label>自訂傷情</label>
+        <input type="text" id="injuryOtherText" class="modal-input" placeholder="例如: 牙齒斷裂, 咬傷...">
+      </div>
+      <div class="modal-btns">
+        <button class="modal-btn btn-cancel" onclick="window.closeInjuryModal()">取消</button>
+        <button class="modal-btn btn-confirm" onclick="window.confirmInjury()">確認標記</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 生命徵象「其他」專用文字輸入彈窗 -->
+  <div id="vitalsInputModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-title">輸入生命徵象數值</div>
+      <div class="modal-row">
+        <input type="text" id="customVitalsInput" class="modal-input" placeholder="例如: BP 160/100, 心跳 120">
+      </div>
+      <div class="modal-btns">
+        <button class="modal-btn btn-cancel" onclick="window.closeVitalsModal()">取消</button>
+        <button class="modal-btn btn-confirm" onclick="window.confirmVitalsModal()">確認</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 自訂提示視窗 -->
+  <div id="noticeOverlay" class="notice-overlay" onclick="if(event.target===this) window.closeNotice()">
+    <div id="noticeCard" class="notice-card success">
+      <div id="noticeIcon" class="notice-icon">✓</div>
+      <div id="noticeTitle" class="notice-title"></div>
+      <div id="noticeMsg" class="notice-msg"></div>
+      <button type="button" class="notice-btn" onclick="window.closeNotice()">確定</button>
+    </div>
+  </div>
+
+  <!-- 自訂確認視窗 -->
+  <div id="confirmOverlay" class="notice-overlay">
+    <div class="notice-card info">
+      <div id="confirmIcon" class="notice-icon">?</div>
+      <div id="confirmTitle" class="notice-title"></div>
+      <div id="confirmMsg" class="notice-msg"></div>
+      <div class="notice-btns">
+        <button type="button" class="notice-btn secondary" onclick="window.resolveConfirm(false)">取消</button>
+        <button type="button" id="confirmOkBtn" class="notice-btn danger" onclick="window.resolveConfirm(true)">確定</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="loading">資料處理中...</div>
+  
+  <!-- 預覽視窗 (z-index: 8000) -->
+  <div id="previewOverlay">
+    <div class="preview-card">
+      <div class="preview-scroll-wrapper" id="previewCaptureArea">
+        <div class="report-header">
+          <div>
+            <div class="report-title">白沙屯醫護團 - 救護紀錄表</div>
+            <div class="report-subtitle">EMERGENCY MEDICAL SERVICE REPORT</div>
+          </div>
+          <div id="reportTopMeta" class="report-top-meta"></div>
+        </div>
+        <div id="pDataArea"></div>
+      </div>
+      <div class="preview-btns">
+        <button class="p-btn" onclick="document.getElementById('previewOverlay').style.display='none'">返回修改</button>
+        <button class="p-btn p-btn-ok" onclick="window.finalSubmit()">確認送出</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ★ 管理員專屬主控台 (分日期、收合圖表、點進去編輯) ★ -->
+  <div id="adminConsoleOverlay">
+    <div class="console-card">
+      <div class="console-header">
+        <span>📊 救護主控台</span>
+        <button onclick="document.getElementById('adminConsoleOverlay').style.display='none'" style="background:transparent; border:none; color:#fff; font-size:18px; font-weight:bold; cursor:pointer;">✕</button>
+      </div>
+      
+      <!-- 主控台分頁標籤 -->
+      <div class="console-tabs">
+        <div class="console-tab active" id="cTab-list" onclick="window.switchConsoleTab('list')">📋 案件清單</div>
+        <div class="console-tab" id="cTab-stats" onclick="window.switchConsoleTab('stats')">📈 數據分析儀表板</div>
+        <div class="console-tab" id="cTab-map" onclick="window.switchConsoleTab('map')">🗺 傷患地圖</div>
+      </div>
+
+      <!-- 分頁 1: 案件清單 -->
+      <div class="console-panel active" id="panel-list">
+        <!-- 每日導覽列 -->
+        <div class="date-nav-bar">
+          <button class="date-nav-btn" onclick="window.changeDateOffset(-1)">◀ 前一日</button>
+          <span id="currentDateDisplay">選擇日期檢視</span>
+          <button class="date-nav-btn" onclick="window.changeDateOffset(1)">後一日 ▶</button>
+        </div>
+
+        <div class="console-filter-bar">
+          <input type="text" id="filterKeyword" placeholder="搜尋姓名/臂章/問題..." oninput="window.filterConsoleRecords()">
+          <button onclick="window.clearDateFilter()" style="background:#64748b; color:#fff; border:none; padding:4px 8px; border-radius:6px; font-size:11px; cursor:pointer;">顯示全部</button>
+        </div>
+        <div class="view-mode-bar" id="viewModeBar">
+          <button type="button" data-mode="list" onclick="window.setListView('list')">☰ 條列</button>
+          <button type="button" data-mode="small" onclick="window.setListView('small')">▦ 小圖</button>
+          <button type="button" data-mode="medium" onclick="window.setListView('medium')">◫ 中圖</button>
+          <button type="button" data-mode="large" onclick="window.setListView('large')">▢ 大圖</button>
+        </div>
+        <div id="consoleQuickStats" style="font-size:11px; padding:4px 8px; background:#e0f2fe; color:#0369a1; font-weight:bold; border-bottom:1px solid #bae6fd;">載入中...</div>
+        <div id="consoleRecordsList" style="flex:1; overflow-y:auto; margin-top:4px;">載入中...</div>
+      </div>
+
+      <!-- 分頁 2: 數據分析儀表板 (可收合展開細項) -->
+      <div class="console-panel" id="panel-stats">
+        <div class="stats-card">
+          <div class="stats-card-title">📌 出勤總覽</div>
+          <div id="statsTotalSummary" style="font-size:14px; color:#1e293b; font-weight:bold;">計算中...</div>
+        </div>
+        <div class="stats-card">
+          <div class="stats-card-title">📊 核心問題分類與細項分析 (點擊可展開)</div>
+          <div id="statsProblemChart">計算中...</div>
+        </div>
+      </div>
+
+      <!-- 分頁 3: 傷患總地圖 -->
+      <div class="console-panel" id="panel-map">
+        <div class="view-mode-bar" id="mapScopeBar" style="padding-bottom:0;">
+          <button type="button" data-scope="all" class="active" onclick="window.setMapScope('all')">全部日期</button>
+          <button type="button" data-scope="day" onclick="window.setMapScope('day')">僅目前日期</button>
+        </div>
+        <div id="mapStatus" style="font-size:11px; padding:4px 8px; margin-top:6px; background:#e0f2fe; color:#0369a1; font-weight:bold;">尚未載入</div>
+        <div id="bigMap"></div>
+        <div id="mapLegend" class="map-legend"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- =========================================
+       核心邏輯 (JavaScript)
+       ========================================= -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js";
+    import { initializeFirestore, persistentLocalCache, collection, addDoc, getDocs, doc, getDoc, setDoc, deleteDoc, updateDoc, query, orderBy, serverTimestamp } 
+    from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyA_5hmnIBCeLszWW8kIjgOZelv-c6-ALfY",
+      authDomain: "linebot-firebase-b1242.firebaseapp.com",
+      projectId: "linebot-firebase-b1242",
+      storageBucket: "linebot-firebase-b1242.firebasestorage.app",
+      messagingSenderId: "1002268658683",
+      appId: "1:1002268658683:web:739adcd7819f8c9393595e",
+      measurementId: "G-1Z55WR53W7"
+    };
+    const MY_LIFF_ID = "YOUR_LIFF_ID_HERE"; 
+
+    const app = initializeApp(firebaseConfig);
+    const analytics = getAnalytics(app);
+    const db = initializeFirestore(app, { localCache: persistentLocalCache() });
+
+    const steps = ['basic', 'scene', 'treatment', 'vitals'];
+    let currentStep = 0;
+    let allRecordsData = []; 
+    let availableDates = []; 
+    let currentDateIndex = 0; 
+    let isShowingAllDates = false;
+    let editingId = null; // ★ 目前正在編輯的紀錄 ID（null = 新增模式）
+
+    window.updateWizard = function() {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.getElementById('tab-' + steps[currentStep]).classList.add('active');
+      document.querySelectorAll('.tab-item').forEach((el, index) => {
+        if(index === currentStep) el.classList.add('active'); else el.classList.remove('active');
+      });
+      document.getElementById('prevBtn').style.display = (currentStep === 0) ? 'none' : 'block';
+      if(currentStep === steps.length - 1) {
+        document.getElementById('nextBtn').style.display = 'none';
+        document.getElementById('submitBtn').style.display = 'block';
+      } else {
+        document.getElementById('nextBtn').style.display = 'block';
+        document.getElementById('submitBtn').style.display = 'none';
+      }
+      document.querySelector('.content-scroll-area').scrollTop = 0;
+    };
+    window.nextStep = function() { if(currentStep < steps.length - 1) { if(!checkStep(currentStep)) return; currentStep++; window.updateWizard(); } };
+    window.prevStep = function() { if(currentStep > 0) { currentStep--; window.updateWizard(); } };
+
+    function setNowTime() {
+      const now = new Date();
+      const dateStr = now.getFullYear() + "-" + String(now.getMonth()+1).padStart(2,'0') + "-" + String(now.getDate()).padStart(2,'0');
+      const timeStr = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
+      document.getElementById("headerTime").innerText = dateStr;
+      document.getElementById("caseTimeInput").value = dateStr + " " + timeStr;
+    }
+
+    window.onload = async function() {
+      setNowTime();
+      window.updateWizard();
+
+      await loadBodyConfigFromFirebase();
+      initAdminEditor();
+
+      liff.init({ liffId: MY_LIFF_ID }).then(() => {
+        if (liff.isLoggedIn()) {
+          liff.getProfile().then(profile => {
+            document.getElementById('personnelInput').value = profile.displayName;
+          });
+        }
+      }).catch(() => {});
+    };
+
+    // ★ 地圖嵌入（有座標用座標，沒有就用地址搜尋；不需 API Key）
+    function mapEmbedHtml(lat, lng, addr, h) {
+      const q = (lat && lng) ? (lat + ',' + lng) : String(addr || '').trim();
+      if (!q) return '<span class="map-none">無地點資料</span>';
+      const enc = encodeURIComponent(q);
+      return `<div class="map-embed-wrap">
+        <iframe src="https://maps.google.com/maps?q=${enc}&z=17&output=embed" style="${h ? 'height:' + h + 'px;' : ''}" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+        <a class="map-open-link" href="https://www.google.com/maps/search/?api=1&query=${enc}" target="_blank" rel="noopener">🗺 在 Google 地圖開啟</a>
+      </div>`;
+    }
+
+    function updateGpsMap() {
+      const box = document.getElementById('gpsMapPreview');
+      const lat = document.getElementById('gps_lat').value;
+      const lng = document.getElementById('gps_lng').value;
+      if (lat && lng) {
+        box.innerHTML = mapEmbedHtml(lat, lng, '', 170);
+        box.style.display = 'block';
+      } else {
+        box.innerHTML = '';
+        box.style.display = 'none';
+      }
+    }
+
+    // ★ 座標 → 地址（OpenStreetMap Nominatim 反向地理編碼）
+    let lastAutoAddress = '';
+    async function fillAddressFromGPS(lat, lng) {
+      const input = document.querySelector('input[name="location"]');
+      const cur = input.value.trim();
+      if (cur && cur !== lastAutoAddress) return; // 使用者已自行輸入地址，不覆蓋
+      input.placeholder = '地址轉換中...';
+      try {
+        const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=zh-TW`;
+        const res = await fetch(url);
+        const j = await res.json();
+        const a = j.address || {};
+        const house = a.house_number ? (/^\d+$/.test(a.house_number) ? a.house_number + '號' : a.house_number) : '';
+        const raw = [a.county || a.city || a.state, a.city_district || a.suburb || a.town, a.village || a.neighbourhood, a.road, house];
+        const parts = raw.filter((v, i) => v && v !== raw[i - 1]);
+        let addr = parts.join('');
+        if (!addr && j.display_name) addr = j.display_name.split(',').map(x => x.trim()).reverse().join('');
+        if (!addr) throw new Error('no address');
+        input.value = addr;
+        lastAutoAddress = addr;
+        const row = input.closest('.row');
+        if (row) row.classList.remove('field-error');
+      } catch (e) {
+        window.showNotice('info', '無法自動取得地址', '已記錄定位座標，請手動輸入地址或地標。');
+      } finally {
+        input.placeholder = '發生地址 (或地標)';
+      }
+    }
+
+    window.getGPS = function() {
+      const btn = document.getElementById('gpsBtn');
+      btn.innerHTML = "定位中...";
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            document.getElementById('gps_lat').value = pos.coords.latitude;
+            document.getElementById('gps_lng').value = pos.coords.longitude;
+            btn.innerHTML = "✅ 已定位"; btn.classList.add('success');
+            updateGpsMap();
+            fillAddressFromGPS(pos.coords.latitude, pos.coords.longitude);
+          },
+          (err) => { btn.innerHTML = "❌ 失敗"; window.showNotice('error', '定位失敗', '無法獲取定位，請確認已開啟定位權限。'); },
+          { enableHighAccuracy: true, timeout: 8000 }
+        );
+      }
+    };
+
+    async function loadBodyConfigFromFirebase() {
+      try {
+        const docRef = doc(db, "system_configs", "body_map_coordinates");
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const cssRules = docSnap.data().cssText;
+          if (cssRules) {
+            document.getElementById('dynamicBodyStyles').innerHTML += cssRules;
+          }
+        }
+      } catch (e) {
+        console.log("載入雲端座標失敗:", e);
+      }
+    }
+
+    window.saveBodyConfigToFirebase = async function() {
+      let cssResult = "";
+      document.querySelectorAll('.body-zone').forEach(zone => {
+        const className = Array.from(zone.classList).find(c => c.startsWith('z-'));
+        const top = zone.style.top;
+        const left = zone.style.left;
+        const width = zone.style.width;
+        const height = zone.style.height;
+        const transform = zone.style.transform;
+        
+        if(top && left && width && height) {
+          const radius = zone.style.borderRadius ? ` border-radius: ${zone.style.borderRadius};` : (className.includes('face') || className.includes('head') ? ' border-radius: 50%;' : '');
+          const rot = transform ? ` transform: ${transform};` : '';
+          cssResult += `.${className} { top: ${top}; left: ${left}; width: ${width}; height: ${height};${rot}${radius}\n}\n`;
+        }
+      });
+
+      if (!cssResult) { window.showNotice('info', '尚未調整', '尚未調整任何區塊！'); return; }
+
+      try {
+        document.getElementById('loading').style.display = 'flex';
+        const docRef = doc(db, "system_configs", "body_map_coordinates");
+        await setDoc(docRef, { cssText: cssResult, updatedAt: serverTimestamp() });
+        document.getElementById('loading').style.display = 'none';
+        window.showNotice('success', '儲存完成', '座標已同步至資料庫，重整後所有裝置都會更新。');
+      } catch (e) {
+        document.getElementById('loading').style.display = 'none';
+        window.showNotice('error', '儲存失敗', e.message);
+      }
+    };
+
+    let isAdminMode = false;
+    let activeAdminZone = null;
+
+    window.toggleAdminMode = function() {
+      isAdminMode = !isAdminMode;
+      const container = document.getElementById('bodyMapContainer');
+      const bar = document.getElementById('adminModeBar');
+      
+      if(isAdminMode) {
+        container.classList.add('admin-editing');
+        bar.classList.add('active');
+        window.showNotice('info', '管理員模式已啟動', '1. 點擊圖塊出現控制點。\n2. 四個綠角可縮放大小。\n3. 頂端橘點可旋轉角度。\n4. 拖曳中心可移動位置。\n5. 調整完畢請點擊「💾 儲存並同步至資料庫」。');
+      } else {
+        container.classList.remove('admin-editing');
+        bar.classList.remove('active');
+        if(activeAdminZone) activeAdminZone.classList.remove('selected-admin');
+        activeAdminZone = null;
+        window.showNotice('info', '已退出管理員模式', '');
+      }
+    };
+
+    function initAdminEditor() {
+      const container = document.getElementById('bodyMapContainer');
+
+      document.querySelectorAll('.body-zone').forEach(zone => {
+        ['tl', 'tr', 'bl', 'br'].forEach(pos => {
+          const handle = document.createElement('div');
+          handle.className = `resize-handle handle-${pos}`;
+          zone.appendChild(handle);
+        });
+
+        const rotLine = document.createElement('div');
+        rotLine.className = 'rotate-line';
+        const rotHandle = document.createElement('div');
+        rotHandle.className = 'rotate-handle';
+        zone.appendChild(rotLine);
+        zone.appendChild(rotHandle);
+
+        zone.addEventListener('click', (e) => {
+          if (!isAdminMode) return;
+          e.stopPropagation();
+          document.querySelectorAll('.body-zone').forEach(z => z.classList.remove('selected-admin'));
+          zone.classList.add('selected-admin');
+          activeAdminZone = zone;
+        });
+
+        let isDragging = false;
+        let startX, startY, initialLeft, initialTop;
+
+        zone.addEventListener('mousedown', (e) => {
+          if (!isAdminMode || e.target.classList.contains('resize-handle') || e.target.classList.contains('rotate-handle')) return;
+          isDragging = true;
+          startX = e.clientX; startY = e.clientY;
+          initialLeft = parseFloat(zone.style.left) || parsePercent(zone, 'left', container.clientWidth);
+          initialTop = parseFloat(zone.style.top) || parsePercent(zone, 'top', container.clientHeight);
+          e.stopPropagation();
+        });
+
+        window.addEventListener('mousemove', (e) => {
+          if (!isDragging || !isAdminMode) return;
+          const dx = e.clientX - startX;
+          const dy = e.clientY - startY;
+          zone.style.left = (initialLeft + (dx / container.clientWidth) * 100).toFixed(2) + '%';
+          zone.style.top = (initialTop + (dy / container.clientHeight) * 100).toFixed(2) + '%';
+        });
+
+        window.addEventListener('mouseup', () => { isDragging = false; });
+
+        zone.querySelectorAll('.resize-handle').forEach(handle => {
+          let isResizing = false;
+          let rStartX, rStartY, initW, initH, initL, initT;
+
+          handle.addEventListener('mousedown', (e) => {
+            if (!isAdminMode) return;
+            isResizing = true;
+            rStartX = e.clientX; rStartY = e.clientY;
+            initW = parseFloat(zone.style.width) || 10;
+            initH = parseFloat(zone.style.height) || 10;
+            initL = parseFloat(zone.style.left) || 0;
+            initT = parseFloat(zone.style.top) || 0;
+            e.stopPropagation();
+          });
+
+          window.addEventListener('mousemove', (e) => {
+            if (!isResizing || !isAdminMode) return;
+            const dx = ((e.clientX - rStartX) / container.clientWidth) * 100;
+            const dy = ((e.clientY - rStartY) / container.clientHeight) * 100;
+
+            if (handle.classList.contains('handle-br')) {
+              zone.style.width = Math.max(2, initW + dx) + '%';
+              zone.style.height = Math.max(2, initH + dy) + '%';
+            } else if (handle.classList.contains('handle-bl')) {
+              zone.style.width = Math.max(2, initW - dx) + '%';
+              zone.style.left = (initL + dx) + '%';
+              zone.style.height = Math.max(2, initH + dy) + '%';
+            } else if (handle.classList.contains('handle-tr')) {
+              zone.style.width = Math.max(2, initW + dx) + '%';
+              zone.style.height = Math.max(2, initH - dy) + '%';
+              zone.style.top = (initT + dy) + '%';
+            } else if (handle.classList.contains('handle-tl')) {
+              zone.style.width = Math.max(2, initW - dx) + '%';
+              zone.style.left = (initL + dx) + '%';
+              zone.style.height = Math.max(2, initH - dy) + '%';
+              zone.style.top = (initT + dy) + '%';
+            }
+          });
+
+          window.addEventListener('mouseup', () => { isResizing = false; });
+        });
+
+        let isRotating = false;
+        rotHandle.addEventListener('mousedown', (e) => {
+          if (!isAdminMode) return;
+          isRotating = true;
+          e.stopPropagation();
+        });
+
+        window.addEventListener('mousemove', (e) => {
+          if (!isRotating || !isAdminMode) return;
+          const rect = zone.getBoundingClientRect();
+          const centerX = rect.left + rect.width / 2;
+          const centerY = rect.top + rect.height / 2;
+          const radians = Math.atan2(e.clientY - centerY, e.clientX - centerX);
+          let deg = Math.round(radians * (180 / Math.PI) + 90);
+          zone.style.transform = `rotate(${deg}deg)`;
+        });
+
+        window.addEventListener('mouseup', () => { isRotating = false; });
+      });
+    }
+
+    function parsePercent(el, prop, totalSize) {
+      const val = parseFloat(window.getComputedStyle(el)[prop]) || 0;
+      return (val / totalSize) * 100;
+    }
+
+    let activeModalState = { checkboxId: null, labelId: null, hiddenId: null, defaultLabel: "" };
+
+    window.openGenericModal = function(checkboxEl, labelId, hiddenId, title, placeholder) {
+      if(checkboxEl.checked) {
+        activeModalState = { checkboxId: checkboxEl.id, labelId: labelId, hiddenId: hiddenId, defaultLabel: document.getElementById(labelId).innerText };
+        document.getElementById('genericModalTitle').innerText = title;
+        document.getElementById('genericModalInput').placeholder = placeholder;
+        document.getElementById('genericModalInput').value = document.getElementById(hiddenId).value;
+        document.getElementById('genericTextModal').style.display = 'flex';
+        setTimeout(() => document.getElementById('genericModalInput').focus(), 100);
+      } else {
+        document.getElementById(hiddenId).value = "";
+        document.getElementById(labelId).innerText = document.getElementById(labelId).getAttribute('data-default') || "其他";
+      }
+    };
+
+    window.closeGenericModal = function() {
+      document.getElementById('genericTextModal').style.display = 'none';
+      if(document.getElementById(activeModalState.hiddenId).value === "") {
+        document.getElementById(activeModalState.checkboxId).checked = false;
+      }
+    };
+
+    window.confirmGenericModal = function() {
+      const val = document.getElementById('genericModalInput').value.trim();
+      if(val !== "") {
+        document.getElementById(activeModalState.hiddenId).value = val;
+        if(!document.getElementById(activeModalState.labelId).hasAttribute('data-default')) {
+           document.getElementById(activeModalState.labelId).setAttribute('data-default', activeModalState.defaultLabel);
+        }
+        document.getElementById(activeModalState.labelId).innerText = "其他: " + val;
+        document.getElementById('genericTextModal').style.display = 'none';
+      } else { window.showNotice('info', '請輸入內容', '請輸入內容，或按取消'); }
+    };
+
+    window.promptVitalsOther = function() {
+      document.getElementById('customVitalsInput').value = document.getElementById('postVitalsOtherText').value;
+      document.getElementById('vitalsInputModal').style.display = 'flex';
+      setTimeout(() => document.getElementById('customVitalsInput').focus(), 100);
+    };
+
+    window.closeVitalsModal = function() {
+      document.getElementById('vitalsInputModal').style.display = 'none';
+      if(document.getElementById('postVitalsOtherText').value === "") {
+        document.querySelector('input[name="postVitals"][value="意識清楚生命徵象穩定"]').checked = true;
+      }
+    };
+
+    window.confirmVitalsModal = function() {
+      const val = document.getElementById('customVitalsInput').value.trim();
+      if(val !== "") {
+        document.getElementById('postVitalsOtherText').value = val;
+        document.getElementById('vitalsOtherLabel').innerText = "其他: " + val;
+        document.getElementById('vitalsInputModal').style.display = 'none';
+      } else { window.showNotice('info', '請輸入內容', '請輸入數值內容，或按取消'); }
+    };
+
+    window.clearVitalsOther = function() {
+      document.getElementById('postVitalsOtherText').value = "";
+      document.getElementById('vitalsOtherLabel').innerText = "其他 (點擊輸入異常數值)";
+    };
+
+    window.compressedImagesArray = []; 
+    window.handleImageUpload = function(event) {
+      const files = event.target.files;
+      if(!files || files.length === 0) return;
+
+      for (let i = 0; i < files.length; i++) {
+        if(window.compressedImagesArray.length >= 2) {
+          window.showNotice('info', '照片已達上限', '最多只能上傳 2 張照片！');
+          break;
+        }
+
+        const file = files[i];
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const img = new Image();
+          img.onload = function() {
+            const canvas = document.createElement('canvas');
+            let width = img.width, height = img.height;
+            const MAX_SIZE = 1024; 
+            if (width > height && width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; } 
+            else if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; }
+            canvas.width = width; canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.6); 
+            
+            window.compressedImagesArray.push(dataUrl);
+            renderImagePreviews();
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+    };
+
+    function renderImagePreviews() {
+      const container = document.getElementById('imagePreviewContainer');
+      container.innerHTML = "";
+      if(window.compressedImagesArray.length > 0) {
+        container.style.display = 'flex';
+        window.compressedImagesArray.forEach((base64, index) => {
+          container.innerHTML += `
+            <div class="img-thumb-wrap">
+              <img src="${base64}">
+              <button type="button" class="img-remove-btn" onclick="window.removeImage(${index})">✖ 移除</button>
+            </div>
+          `;
+        });
+      } else {
+        container.style.display = 'none';
+      }
+    }
+
+    window.removeImage = function(index) {
+      window.compressedImagesArray.splice(index, 1);
+      renderImagePreviews();
+      document.getElementById('imageUpload').value = ""; 
+    };
+
+    let selectedPartsData = [];
+    let currentElement = null;
+    let currentPartName = "";
+
+    window.toggleBodyPart = function(element, partName) {
+      if(isAdminMode) return;
+      if (element.classList.contains('active')) {
+        element.classList.remove('active');
+        selectedPartsData = selectedPartsData.filter(item => item.part !== partName);
+        window.updateInjuredDisplay();
+        return;
+      }
+      currentElement = element; currentPartName = partName;
+      document.getElementById('modalPartName').innerText = partName;
+      document.getElementById('injuryType').value = "起水泡";
+      window.updateModalInput();
+      document.getElementById('injuryModal').style.display = 'flex';
+    };
+    
+    window.closeInjuryModal = function() { document.getElementById('injuryModal').style.display = 'none'; };
+    
+    window.updateModalInput = function() {
+      const type = document.getElementById('injuryType').value;
+      document.getElementById('inputAreaArea').style.display = (type === '擦傷/破皮' || type === '紅腫/瘀青' || type === '起水泡') ? 'block' : 'none';
+      document.getElementById('inputLengthArea').style.display = (type === '撕裂傷/割傷' || type === '燒燙傷/炸傷') ? 'block' : 'none';
+      document.getElementById('inputOtherArea').style.display = (type === '其他') ? 'block' : 'none';
+    };
+    
+    window.confirmInjury = function() {
+      const type = document.getElementById('injuryType').value;
+      let detail = type;
+      if (type === '擦傷/破皮' || type === '紅腫/瘀青' || type === '起水泡') {
+        detail = `${type} (${document.getElementById('areaW').value||'0'}x${document.getElementById('areaH').value||'0'} cm)`;
+      } else if (type === '撕裂傷/割傷' || type === '燒燙傷/炸傷') {
+        detail = `${type} (長度 ${document.getElementById('injuryLen').value||'0'} cm)`;
+      } else if (type === '其他') {
+        detail = `其他: ${document.getElementById('injuryOtherText').value || '未註明'}`;
+      }
+      
+      const rect = currentElement.getBoundingClientRect();
+      const parentRect = document.getElementById('bodyMapContainer').getBoundingClientRect();
+      const x = ((rect.left + rect.width / 2 - parentRect.left) / parentRect.width) * 100;
+      const y = ((rect.top + rect.height / 2 - parentRect.top) / parentRect.height) * 100;
+
+      selectedPartsData.push({ part: currentPartName, desc: detail, x: x, y: y });
+      currentElement.classList.add('active');
+      window.updateInjuredDisplay();
+      window.closeInjuryModal();
+    };
+    
+    window.updateInjuredDisplay = function() {
+      document.getElementById('selectedBodyParts').innerHTML = selectedPartsData.length > 0 
+        ? "<div style='font-weight: 800; margin-bottom: 8px; color: #555;'>已標記項目:</div>" + selectedPartsData.map(i => `<div class='injury-item-row'>📍 ${i.part}: <span style='color:#333;'>${i.desc}</span></div>`).join("")
+        : "尚無標記";
+    };
+
+    function getCheckedValuesWithHidden(checkboxName, hiddenInputId) {
+      const form = document.getElementById('ambulanceForm');
+      let result = [];
+      form.querySelectorAll(`input[name="${checkboxName}"]:checked`).forEach(i => {
+        if(i.value === "其他") {
+          const hiddenVal = document.getElementById(hiddenInputId).value.trim();
+          result.push(`其他: ${hiddenVal !== '' ? hiddenVal : '未註明'}`);
+        } else {
+          result.push(i.value);
+        }
+      });
+      return result.length > 0 ? result.join(", ") : "無";
+    }
+
+    // ★ 必填檢查：年齡、臂章編號、電話、照片為選填（沒填存「無」），其餘皆必填
+    function collectMissing() {
+      const form = document.getElementById('ambulanceForm');
+      const fd = new FormData(form);
+      const filled = v => String(v || '').trim() !== '';
+      const missing = [];
+      const add = (step, label, el) => missing.push({ step: step, label: label, el: el });
+      const boxOf = name => { const i = form.elements[name]; return i ? i.closest('.col-box, .row, .card') : null; };
+
+      if (!filled(fd.get('personnel'))) add(0, '人員', boxOf('personnel'));
+      if (!filled(fd.get('location'))) add(0, '地點', boxOf('location'));
+      if (!filled(fd.get('pName'))) add(0, '患者姓名', boxOf('pName'));
+
+      const problems = getCheckedValuesWithHidden('problems', 'problemOtherValue');
+      if (problems === '無' || problems.includes('其他: 未註明')) add(1, '問題類型（含「其他」內容）', document.querySelector('#tab-scene .scene-grid-container'));
+      if (!filled(fd.get('mainComplaint'))) add(1, '主訴描述', boxOf('mainComplaint'));
+
+      const actions = getCheckedValuesWithHidden('treatment', 'treatmentOtherValue');
+      if (actions === '無' || actions.includes('其他: 未註明')) add(2, '處置項目（含「其他」內容）', document.querySelector('#tab-treatment .scene-grid-container'));
+
+      if (fd.get('postVitals') === '其他' && !filled(document.getElementById('postVitalsOtherText').value)) add(3, '處置後生命徵象', document.querySelector('#tab-vitals .scene-grid-container'));
+      if (!filled(fd.get('handoverInfo'))) add(3, '處理團員 / 接手單位資訊', boxOf('handoverInfo'));
+      return missing;
+    }
+
+    // step = 要檢查的分頁索引；-1 = 檢查全部（送出前）
+    function checkStep(step) {
+      const missing = collectMissing().filter(m => step < 0 || m.step === step);
+      document.querySelectorAll('.field-error').forEach(e => e.classList.remove('field-error'));
+      missing.forEach(m => { if (m.el) m.el.classList.add('field-error'); });
+      if (missing.length === 0) return true;
+
+      if (step < 0) { currentStep = missing[0].step; window.updateWizard(); }
+      window.showNotice('error', '尚有必填欄位未填', missing.map(m => '• ' + m.label).join('\n'));
+      const first = missing.find(m => m.el && m.step === currentStep);
+      if (first) setTimeout(() => first.el.scrollIntoView({ behavior: 'smooth', block: 'center' }), 60);
+      return false;
+    }
+
+    function validateRequired() { return checkStep(-1); }
+
+    // 使用者操作該欄位後，自動移除紅框
+    ['input', 'change', 'click'].forEach(ev => {
+      document.getElementById('ambulanceForm').addEventListener(ev, e => {
+        const t = e.target.closest ? e.target.closest('.field-error') : null;
+        if (t) t.classList.remove('field-error');
+      });
+    });
+
+    window.showPreview = function() {
+      if (!validateRequired()) return;
+      const fd = new FormData(document.getElementById('ambulanceForm'));
+
+      // ★ 還原預覽視窗底部按鈕（檢視紀錄時會被換掉，這裡確保送出預覽永遠是正確按鈕）
+      document.querySelector('#previewOverlay .preview-btns').innerHTML = `
+        <button class="p-btn" onclick="document.getElementById('previewOverlay').style.display='none'">返回修改</button>
+        <button class="p-btn p-btn-ok" onclick="window.finalSubmit()">${editingId ? '確認儲存' : '確認送出'}</button>
+      `;
+      
+      document.getElementById('reportTopMeta').innerHTML = `
+        🕒 ${fd.get('caseTime') || '未填'}<br>
+        👤 ${fd.get('personnel') || '未填'}
+      `;
+
+      const injuredText = selectedPartsData.length > 0 
+        ? selectedPartsData.map(i => `<b style="color:#D65A68;">• ${i.part}</b>: ${i.desc}`).join("<br>") 
+        : '<span style="color:#888;">無</span>';
+
+      let dotsHtml = '';
+      selectedPartsData.forEach(i => {
+        if(i.x && i.y) {
+          dotsHtml += `<div class="preview-dot" style="top: ${i.y}%; left: ${i.x}%;"></div>`;
+        }
+      });
+
+      let vitalsResult = "意識清楚生命徵象穩定";
+      if(fd.get('postVitals') === "其他") {
+        vitalsResult = document.getElementById('postVitalsOtherText').value.trim() || "未填";
+      }
+
+      let photosHtml = '';
+      if(window.compressedImagesArray.length > 0) {
+        window.compressedImagesArray.forEach(b64 => {
+          photosHtml += `<img src="${b64}" class="preview-photo">`;
+        });
+      } else {
+        photosHtml = '<span style="color:#888; font-size:10px;">未上傳照片</span>';
+      }
+
+      const html = `
+        <div class="report-section-title">1. 病患與案件基本資料</div>
+        <div class="report-grid">
+          <div class="report-item"><span>姓名 / 性別</span><b>${fd.get('pName') || '不詳'} (${fd.get('gender')})</b></div>
+          <div class="report-item"><span>年齡 / 電話</span><b>${fd.get('age') ? fd.get('age') + '歲' : '無'} / ${fd.get('pPhone') || '無'}</b></div>
+          <div class="report-item"><span>臂章編號</span><b>${fd.get('armband') || '無'}</b></div>
+          <div class="report-item"><span>地點</span><b>${fd.get('location') || '未填'}</b></div>
+        </div>
+
+        <div class="report-section-title">2. 現場狀況與主訴</div>
+        <div class="report-grid">
+          <div class="report-item report-grid-full"><span>問題:</span> <b>${getCheckedValuesWithHidden('problems', 'problemOtherValue')}</b></div>
+          <div class="report-item report-grid-full"><span>主訴:</span> <b>${fd.get('mainComplaint') || '無'}</b></div>
+        </div>
+
+        <div class="report-section-title">3. 傷情部位與人體圖標記</div>
+        <div style="display: flex; gap: 8px; align-items: center; background: #f9f9f9; padding: 6px; border-radius: 6px; border: 1px solid #eee;">
+          <div class="preview-body-container" style="flex-shrink:0;">
+            <img src="https://i.ibb.co/6JFnSZp7/image.jpg" class="preview-body-img">
+            ${dotsHtml}
+          </div>
+          <div style="font-size: 11px; line-height: 1.4; flex-grow: 1;">
+            ${injuredText}
+          </div>
+        </div>
+
+        <div class="report-section-title">4. 處置、交班與現場照片</div>
+        <div class="report-grid">
+          <div class="report-item report-grid-full"><span>處置:</span> <b>${getCheckedValuesWithHidden('treatment', 'treatmentOtherValue')}</b></div>
+          <div class="report-item"><span>徵象:</span> <b>${vitalsResult}</b></div>
+          <div class="report-item"><span>交班:</span> <b>${fd.get('handoverInfo') || '無'}</b></div>
+        </div>
+        <div class="preview-photos-grid">
+          ${photosHtml}
+        </div>
+        ${(fd.get('gps_lat') || fd.get('location')) ? `<div class="report-section-title">5. 發生地點地圖</div>${mapEmbedHtml(fd.get('gps_lat'), fd.get('gps_lng'), fd.get('location'), 150)}` : ''}
+        <div style="text-align:center; font-size:10px; color:#888; margin-top:8px;">💡 提示：您可以直接「長按上方表格」將整張紀錄表儲存為圖片</div>
+      `;
+
+      document.getElementById('pDataArea').innerHTML = html;
+      document.getElementById('previewOverlay').style.display = 'flex';
+    };
+
+    // =========================================
+    // ★ 日期時間解析（相容舊資料 2026/4/13 下午4:05:00 與新資料 2026-04-13 16:05）
+    // =========================================
+    function parseCaseTime(str) {
+      const s = String(str || '');
+      const dm = s.match(/(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/);
+      if (!dm) return { date: '', time: '', key: '' };
+      const date = dm[1] + '-' + dm[2].padStart(2, '0') + '-' + dm[3].padStart(2, '0');
+      const rest = s.slice(dm.index + dm[0].length);
+      const tm = rest.match(/(上午|下午|AM|PM)?\s*(\d{1,2}):(\d{2})/i);
+      let time = '';
+      if (tm) {
+        let h = parseInt(tm[2], 10);
+        const tag = tm[1] || '';
+        if ((tag === '下午' || /^pm$/i.test(tag)) && h < 12) h += 12;
+        if ((tag === '上午' || /^am$/i.test(tag)) && h === 12) h = 0;
+        time = String(h).padStart(2, '0') + ':' + tm[3];
+      }
+      return { date: date, time: time, key: date + ' ' + (time || '00:00') };
+    }
+
+    // =========================================
+    // ★ 主控台邏輯 (日期左右導覽、智慧分類收合、點進去編輯)
+    // =========================================
+    window.switchConsoleTab = function(tabName) {
+      document.querySelectorAll('.console-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.console-panel').forEach(p => p.classList.remove('active'));
+      document.getElementById('cTab-' + tabName).classList.add('active');
+      document.getElementById('panel-' + tabName).classList.add('active');
+      if(tabName === 'stats') renderStatsCharts();
+      if(tabName === 'map') renderBigMap();
+    };
+
+    // =========================================
+    // ★ 傷患總地圖：所有案件的地點標記（有座標直接標；只有地址的自動轉座標並快取）
+    // =========================================
+    const CAT_COLORS = { '起水泡問題': '#0ea5e9', '抽筋/痠痛': '#8b5cf6', '跌倒/擦摔': '#f59e0b', '冷熱急症': '#ef4444', '車禍': '#111827', '肢體無力/暈眩': '#10b981', '創傷/割燙傷': '#ec4899', '其他': '#64748b' };
+    let bigMap = null, markerLayer = null, mapScope = 'all', geoRunId = 0;
+    const GEO_KEY = 'geoCacheV2';
+    function loadGeoCache() { try { return JSON.parse(localStorage.getItem(GEO_KEY) || '{}'); } catch (e) { return {}; } }
+    function saveGeoCache(c) { try { localStorage.setItem(GEO_KEY, JSON.stringify(c)); } catch (e) {} }
+
+    window.setMapScope = function(scope) {
+      mapScope = scope;
+      document.querySelectorAll('#mapScopeBar button').forEach(b => b.classList.toggle('active', b.dataset.scope === scope));
+      renderBigMap();
+    };
+
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+    // 地址 → 座標：清理地址、限定在苗栗～雲林範圍內搜尋，依序嘗試 完整地址 → 去掉「門口/旁」等 → 只到路名
+    async function geocodeAddress(addr) {
+      const base = String(addr).replace(/^\d{3,6}\s*/, '').replace(/\s+/g, '').replace(/台(中|北|南|東)/g, '臺$1');
+      const noSuffix = base.replace(/(門口|附近|旁邊|旁|對面|前方|前面|前|路口|入口)$/, '');
+      const roadOnly = base.replace(/\d+(之\d+)?號.*$/, '');
+      const variants = Array.from(new Set([base, noSuffix, roadOnly])).filter(v => v.length >= 2);
+      for (const q of variants) {
+        const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=tw&accept-language=zh-TW&viewbox=120.0,24.9,121.0,23.4&bounded=1&q=${encodeURIComponent(q)}`;
+        const res = await fetch(url);
+        const j = await res.json();
+        await sleep(1100);
+        if (j[0]) return [parseFloat(j[0].lat), parseFloat(j[0].lon)];
+      }
+      return null;
+    }
+
+    async function renderBigMap() {
+      const statusEl = document.getElementById('mapStatus');
+      if (typeof L === 'undefined') { statusEl.innerText = '地圖元件載入失敗，請檢查網路後重新開啟'; return; }
+
+      if (!bigMap) {
+        bigMap = L.map('bigMap').setView([24.4, 120.6], 10);
+        const emap = L.tileLayer('https://wmts.nlsc.gov.tw/wmts/EMAP/default/GoogleMapsCompatible/{z}/{y}/{x}', { maxZoom: 19, maxNativeZoom: 18, attribution: '© 內政部國土測繪中心' });
+        const photo = L.tileLayer('https://wmts.nlsc.gov.tw/wmts/PHOTO2/default/GoogleMapsCompatible/{z}/{y}/{x}', { maxZoom: 19, maxNativeZoom: 19, attribution: '© 內政部國土測繪中心' });
+        emap.addTo(bigMap);
+        L.control.layers({ '電子地圖': emap, '正射影像（衛星）': photo }, null, { position: 'topright' }).addTo(bigMap);
+        L.control.scale({ imperial: false }).addTo(bigMap);
+        markerLayer = L.layerGroup().addTo(bigMap);
+        document.getElementById('mapLegend').innerHTML = Object.entries(CAT_COLORS).map(([k, c]) => `<span><i style="background:${c};"></i>${k}</span>`).join('') + '<span>（空心 = 依地址估算位置）</span>';
+      }
+      setTimeout(() => bigMap.invalidateSize(), 60);
+      markerLayer.clearLayers();
+
+      const runId = ++geoRunId;
+      const activeDate = (currentDateIndex >= 0 && currentDateIndex < availableDates.length) ? availableDates[currentDateIndex] : '';
+      const records = allRecordsData.filter(d => mapScope === 'all' || !activeDate || d.caseTimeNormalized === activeDate);
+
+      const points = [];
+      let shown = 0, noGeo = 0, fail = 0;
+      const locOf = d => (typeof d.location === 'string') ? { address: d.location } : (d.location || {});
+
+      const addMarker = (d, lat, lng, approx) => {
+        const l = locOf(d);
+        const pName = d.patient ? d.patient.name : '不詳';
+        const armband = (d.patient && d.patient.armband && d.patient.armband !== '無') ? `(臂章:${d.patient.armband})` : '';
+        const problem = d.scene ? d.scene.problems : '';
+        const color = CAT_COLORS[normalizeCategory(problem)] || '#64748b';
+        const m = L.circleMarker([lat, lng], { radius: 8, color: color, weight: 2, fillColor: color, fillOpacity: approx ? 0.15 : 0.75 });
+        m.bindPopup(`<b>${pName}</b> ${armband}<br><span style="color:#D65A68; font-weight:bold;">${problem}</span><br>🕒 ${d.caseTimeNormalized || ''} ${d.caseTimeHM || ''}<br>📍 ${l.address || '(定位座標)'}${approx ? '<br><span style="color:#94a3b8;">依地址估算位置</span>' : ''}<br><a href="#" onclick="window.openDetailById('${d.id}'); return false;" style="color:#0284c7; font-weight:bold;">檢視紀錄 ›</a>`);
+        m.addTo(markerLayer);
+        points.push([lat, lng]);
+        shown++;
+      };
+
+      const pending = [];
+      records.forEach(d => {
+        const l = locOf(d);
+        const lat = parseFloat(l.lat), lng = parseFloat(l.lng);
+        if (isFinite(lat) && isFinite(lng)) addMarker(d, lat, lng, false);
+        else if (l.address && String(l.address).trim()) pending.push(d);
+        else noGeo++;
+      });
+
+      const refreshStatus = (done) => {
+        statusEl.innerText = `📍 已標示 ${shown} 筆` + (pending.length ? `｜地址轉換 ${done}/${pending.length}` : '') + ((fail + noGeo) ? `｜無法定位 ${fail + noGeo} 筆` : '') + `（共 ${records.length} 件）`;
+      };
+      const fit = () => { if (points.length > 0) bigMap.fitBounds(points, { padding: [30, 30], maxZoom: 16 }); };
+      refreshStatus(0);
+      fit();
+
+      // 只有地址的案件：轉座標（1 秒 1 筆；結果存本機快取，之後不用再查）
+      const cache = loadGeoCache();
+      let done = 0;
+      for (const d of pending) {
+        if (runId !== geoRunId) return;
+        const addr = String(locOf(d).address).trim();
+        let pt = cache[addr];
+        if (pt === undefined) {
+          try {
+            pt = await geocodeAddress(addr);
+            cache[addr] = pt;
+            saveGeoCache(cache);
+          } catch (e) { pt = null; await sleep(1100); }
+        }
+        if (runId !== geoRunId) return;
+        if (pt) addMarker(d, pt[0], pt[1], true); else fail++;
+        done++;
+        refreshStatus(done);
+        if (done % 5 === 0) fit();
+      }
+      fit();
+    }
+
+    window.openAdminConsole = async function() {
+      const consoleOverlay = document.getElementById('adminConsoleOverlay');
+      consoleOverlay.style.display = 'flex';
+      document.getElementById('consoleRecordsList').innerHTML = "正在載入所有救護紀錄...";
+
+      try {
+        const q = query(collection(db, "medical_records"), orderBy("timestamp", "desc"));
+        const querySnapshot = await getDocs(q);
+        
+        allRecordsData = [];
+        let dateSet = new Set();
+
+        querySnapshot.forEach((docSnap) => {
+          const data = { id: docSnap.id, ...docSnap.data() };
+          // ★ 統一日期為 yyyy-mm-dd（補零），時間為 HH:MM（24 小時制）
+          const ct = parseCaseTime(data.caseTime);
+          data.caseTimeNormalized = ct.date;
+          data.caseTimeHM = ct.time;
+          data.sortKey = ct.key;
+          if(ct.date) dateSet.add(ct.date);
+          allRecordsData.push(data);
+        });
+
+        availableDates = Array.from(dateSet).sort();
+        if(availableDates.length > 0) {
+          currentDateIndex = availableDates.length - 1; // 預設顯示最新有資料的那一天
+        }
+
+        window.filterConsoleRecords();
+      } catch (e) {
+        document.getElementById('consoleRecordsList').innerHTML = `<div style="color:red; padding:20px;">載入失敗: ${e.message}</div>`;
+      }
+    };
+
+    window.changeDateOffset = function(direction) {
+      if(availableDates.length === 0) return;
+      if(currentDateIndex < 0) currentDateIndex = availableDates.length - 1;
+      currentDateIndex += direction;
+      if(currentDateIndex < 0) currentDateIndex = 0;
+      if(currentDateIndex >= availableDates.length) currentDateIndex = availableDates.length - 1;
+      window.filterConsoleRecords();
+    };
+
+    window.clearDateFilter = function() {
+      currentDateIndex = -1; // 顯示全部
+      window.filterConsoleRecords();
+    };
+
+    window.filterConsoleRecords = function() {
+      const keyword = document.getElementById('filterKeyword').value.toLowerCase().trim();
+      const activeDate = (currentDateIndex >= 0 && currentDateIndex < availableDates.length) ? availableDates[currentDateIndex] : "";
+
+      document.getElementById('currentDateDisplay').innerText = activeDate ? `📅 ${activeDate}` : "📅 顯示全部日期";
+
+      const filtered = allRecordsData.filter(d => {
+        let matchDate = true;
+        let matchKey = true;
+
+        if(activeDate && currentDateIndex >= 0) {
+          if(d.caseTimeNormalized !== activeDate) matchDate = false;
+        }
+
+        if(keyword) {
+          const name = (d.patient && d.patient.name) ? d.patient.name.toLowerCase() : "";
+          const armband = (d.patient && d.patient.armband) ? d.patient.armband.toLowerCase() : "";
+          const problems = (d.scene && d.scene.problems) ? d.scene.problems.toLowerCase() : "";
+          const personnel = (d.personnel) ? d.personnel.toLowerCase() : "";
+          
+          if(!name.includes(keyword) && !armband.includes(keyword) && !problems.includes(keyword) && !personnel.includes(keyword)) {
+            matchKey = false;
+          }
+        }
+
+        return matchDate && matchKey;
+      });
+
+      // 依照時間由早到晚排序
+      filtered.sort((a, b) => (a.sortKey || '').localeCompare(b.sortKey || ''));
+
+      renderConsoleList(filtered, activeDate);
+    };
+
+    // 智慧歸納大分類（水泡、抽筋/痠痛 分開）
+    function normalizeCategory(problemStr) {
+      if (!problemStr) return "其他";
+      if (problemStr.includes("水泡")) return "起水泡問題";
+      if (problemStr.includes("抽筋") || problemStr.includes("痠痛") || problemStr.includes("酸痛")) return "抽筋/痠痛";
+      if (problemStr.includes("跌") || problemStr.includes("摔") || problemStr.includes("擦") || problemStr.includes("破皮")) return "跌倒/擦摔";
+      if (problemStr.includes("冷熱") || problemStr.includes("熱衰竭") || problemStr.includes("中暑") || problemStr.includes("熱")) return "冷熱急症";
+      if (problemStr.includes("車禍")) return "車禍";
+      if (problemStr.includes("無力") || problemStr.includes("頭暈") || problemStr.includes("想吐")) return "肢體無力/暈眩";
+      if (problemStr.includes("割") || problemStr.includes("撕裂") || problemStr.includes("炸傷") || problemStr.includes("燙傷")) return "創傷/割燙傷";
+      return "其他";
+    }
+
+    // ★ 清單檢視模式：list / small / medium / large
+    let listViewMode = 'list';
+    try { listViewMode = localStorage.getItem('consoleViewMode') || 'list'; } catch (e) {}
+    window.setListView = function(mode) {
+      listViewMode = mode;
+      try { localStorage.setItem('consoleViewMode', mode); } catch (e) {}
+      window.filterConsoleRecords();
+    };
+
+    function renderConsoleList(records, activeDate) {
+      const listContainer = document.getElementById('consoleRecordsList');
+      const statsBox = document.getElementById('consoleQuickStats');
+
+      const totalCount = records.length;
+      statsBox.innerHTML = `<span>當前清單總計出勤: <b>${totalCount}</b> 件案件</span>`;
+
+      document.querySelectorAll('#viewModeBar button').forEach(b => b.classList.toggle('active', b.dataset.mode === listViewMode));
+      listContainer.className = (listViewMode === 'list') ? '' : ('view-grid view-' + listViewMode);
+
+      if(records.length === 0) {
+        listContainer.innerHTML = `<div style='text-align:center; padding:30px; color:#888;'>查無符合條件的救護紀錄</div>`;
+        return;
+      }
+
+      let html = "";
+      records.forEach(d => {
+        const timeShort = d.caseTimeHM || '--:--';
+        const pName = d.patient ? d.patient.name : '不詳';
+        const armband = (d.patient && d.patient.armband) ? `(臂章:${d.patient.armband})` : '';
+        const problem = d.scene ? d.scene.problems : '';
+        const personnel = d.personnel || '未填';
+        const addr = (typeof d.location === 'string') ? d.location : ((d.location && d.location.address) || '');
+
+        if(listViewMode === 'list') {
+          html += `
+            <div class="console-row-item" onclick="window.openDetailById('${d.id}')">
+              <div class="console-row-left">
+                <b>${pName}</b> ${armband} - <span style="color:#D65A68; font-weight:bold;">${problem}</span><br>
+                <span style="color:#64748b;">📍 ${addr || '無地址'}</span>
+              </div>
+              <div class="console-row-right">
+                <span>👤 ${personnel}</span><br>
+                <span class="console-row-time">⏰ ${timeShort}</span>
+              </div>
+            </div>
+          `;
+        } else {
+          const parts = (d.treatment && d.treatment.injuredParts) || [];
+          let dots = '';
+          parts.forEach(i => { if(i.x && i.y) dots += `<div class="preview-dot" style="top:${i.y}%; left:${i.x}%;"></div>`; });
+          const P = d.patient || {};
+          const ga = `${P.gender || ''} ${(P.age && P.age !== '無') ? P.age + '歲' : ''}`.trim();
+          const complaint = (d.scene && d.scene.mainComplaint) || '無';
+          const actions = (d.treatment && d.treatment.actions) || '無';
+          const partsText = parts.length ? parts.map(i => `• ${i.part}: ${i.desc}`).join('<br>') : '無標記';
+          html += `
+            <div class="cc-card" onclick="window.openDetailById('${d.id}')">
+              ${listViewMode === 'large' ? `<div class="cc-media-tabs"><button type="button" data-m="map" class="active" onclick="event.stopPropagation(); window.setCardMedia(this,'map')">🧍 傷情圖</button><button type="button" data-m="photo" onclick="event.stopPropagation(); window.setCardMedia(this,'photo')">📷 現場照片 (${(d.photos || []).length})</button></div>` : ''}
+              <div class="cc-thumb"><div class="cc-map"><img src="https://i.ibb.co/6JFnSZp7/image.jpg" loading="lazy">${dots}</div>${listViewMode === 'large' ? `<div class="cc-pane-photo">${(d.photos && d.photos.length) ? d.photos.map(b => `<img src="${b}" loading="lazy">`).join('') : '<div class="cc-nophoto">未上傳照片</div>'}</div>` : ''}</div>
+              <div class="cc-body">
+                <div><b>${pName}</b> <span class="cc-mid">${ga}</span> <span class="cc-armband">${armband}</span></div>
+                <div class="cc-problem">${problem}</div>
+                <div class="cc-meta">⏰ ${timeShort} · 👤 ${personnel}</div>
+                <div class="cc-addr">📍 ${addr || '無地址'}</div>
+                <div class="cc-extra">
+                  <div><b>主訴：</b>${complaint}</div>
+                  <div><b>處置：</b>${actions}</div>
+                  <div><b>傷情：</b><br>${partsText}</div>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+      });
+      listContainer.innerHTML = html;
+    }
+
+    function renderStatsCharts() {
+      const total = allRecordsData.length;
+      document.getElementById('statsTotalSummary').innerHTML = `總計資料庫累積救護案件：<b style="color:#0284c7; font-size:18px;">${total}</b> 件`;
+
+      let categoryMap = {}; 
+
+      allRecordsData.forEach(r => {
+        const pStr = r.scene && r.scene.problems ? r.scene.problems : "其他";
+        const seenCats = new Set();
+
+        pStr.split(/,\s*/).forEach(subP => {
+          const cleanSub = subP.trim();
+          if(!cleanSub) return;
+          const cat = normalizeCategory(cleanSub);
+          if (!categoryMap[cat]) categoryMap[cat] = { total: 0, subItems: {} };
+          if (!seenCats.has(cat)) { seenCats.add(cat); categoryMap[cat].total++; }
+          categoryMap[cat].subItems[cleanSub] = (categoryMap[cat].subItems[cleanSub] || 0) + 1;
+        });
+      });
+
+      const sortedCategories = Object.entries(categoryMap).sort((a, b) => b[1].total - a[1].total);
+
+      let chartHtml = sortedCategories.length > 0 ? `
+        <div class="stats-toolbar">
+          <button onclick="window.toggleAllCategories(true)">全部展開</button>
+          <button onclick="window.toggleAllCategories(false)">全部收合</button>
+        </div>` : "";
+
+      sortedCategories.forEach(([cat, data], idx) => {
+        const pct = Math.round((data.total / Math.max(total, 1)) * 100);
+        
+        let subHtml = "";
+        Object.entries(data.subItems).sort((a, b) => b[1] - a[1]).forEach(([subName, subCnt]) => {
+          subHtml += `<div class="sub-item-row"><span>• ${subName}</span><b>${subCnt} 件</b></div>`;
+        });
+
+        chartHtml += `
+          <div class="chart-category-box">
+            <div class="chart-main-header" onclick="window.toggleSubCategory('subBox-${idx}')">
+              <span>${cat}</span>
+              <span><b>${data.total}</b> 件 (${pct}%) <span class="chart-arrow">▾</span></span>
+            </div>
+            <div class="chart-bar-bg">
+              <div class="chart-bar-fill" style="width: ${pct}%;"></div>
+            </div>
+            <div class="sub-item-container" id="subBox-${idx}">
+              ${subHtml}
+            </div>
+          </div>
+        `;
+      });
+      document.getElementById('statsProblemChart').innerHTML = chartHtml || "尚無數據";
+    }
+
+    window.toggleSubCategory = function(boxId) {
+      const box = document.getElementById(boxId);
+      if(box) {
+        box.classList.toggle('expanded');
+        const wrap = box.closest('.chart-category-box');
+        if(wrap) wrap.classList.toggle('open', box.classList.contains('expanded'));
+      }
+    };
+
+    window.toggleAllCategories = function(expand) {
+      document.querySelectorAll('#statsProblemChart .sub-item-container').forEach(box => {
+        box.classList.toggle('expanded', expand);
+        const wrap = box.closest('.chart-category-box');
+        if(wrap) wrap.classList.toggle('open', expand);
+      });
+    };
+
+    window.openDetailById = function(id) {
+      const d = allRecordsData.find(r => r.id === id);
+      if(d) window.openDetailRecord(d);
+    };
+
+    window.openDetailRecord = function(jsonStr) {
+      const d = (typeof jsonStr === 'string') ? JSON.parse(jsonStr) : jsonStr;
+      
+      document.getElementById('reportTopMeta').innerHTML = `
+        🕒 ${d.caseTime || '未填'}<br>
+        👤 ${d.personnel || '未填'}
+      `;
+
+      const injuredParts = d.treatment && d.treatment.injuredParts ? d.treatment.injuredParts : [];
+      const injuredText = injuredParts.length > 0 
+        ? injuredParts.map(i => `<b style="color:#D65A68;">• ${i.part}</b>: ${i.desc}`).join("<br>") 
+        : '<span style="color:#888;">無</span>';
+
+      let dotsHtml = '';
+      injuredParts.forEach(i => {
+        if(i.x && i.y) {
+          dotsHtml += `<div class="preview-dot" style="top: ${i.y}%; left: ${i.x}%;"></div>`;
+        }
+      });
+
+      let photosHtml = '';
+      if(d.photos && d.photos.length > 0) {
+        d.photos.forEach(b64 => {
+          photosHtml += `<img src="${b64}" class="preview-photo">`;
+        });
+      } else {
+        photosHtml = '<span style="color:#888; font-size:10px;">未上傳照片</span>';
+      }
+
+      const html = `
+        <div class="report-section-title">1. 病患與案件基本資料</div>
+        <div class="report-grid">
+          <div class="report-item"><span>姓名 / 性別</span><b>${d.patient.name} (${d.patient.gender})</b></div>
+          <div class="report-item"><span>年齡 / 電話</span><b>${(d.patient.age && d.patient.age !== '無') ? d.patient.age + '歲' : '無'} / ${d.patient.phone || '無'}</b></div>
+          <div class="report-item"><span>臂章編號</span><b>${d.patient.armband || '無'}</b></div>
+          <div class="report-item"><span>地點</span><b>${d.location.address || '未填'}</b></div>
+        </div>
+
+        <div class="report-section-title">2. 現場狀況與主訴</div>
+        <div class="report-grid">
+          <div class="report-item report-grid-full"><span>問題:</span> <b>${d.scene.problems}</b></div>
+          <div class="report-item report-grid-full"><span>主訴:</span> <b>${d.scene.mainComplaint || '無'}</b></div>
+        </div>
+
+        <div class="report-section-title">3. 傷情部位與人體圖標記</div>
+        <div style="display: flex; gap: 8px; align-items: center; background: #f9f9f9; padding: 6px; border-radius: 6px; border: 1px solid #eee;">
+          <div class="preview-body-container" style="flex-shrink:0;">
+            <img src="https://i.ibb.co/6JFnSZp7/image.jpg" class="preview-body-img">
+            ${dotsHtml}
+          </div>
+          <div style="font-size: 11px; line-height: 1.4; flex-grow: 1;">
+            ${injuredText}
+          </div>
+        </div>
+
+        <div class="report-section-title">4. 處置、交班與現場照片</div>
+        <div class="report-grid">
+          <div class="report-item report-grid-full"><span>處置:</span> <b>${d.treatment.actions}</b></div>
+          <div class="report-item"><span>徵象:</span> <b>${d.followUp.postVitals}</b></div>
+          <div class="report-item"><span>交班:</span> <b>${d.followUp.handoverInfo || '無'}</b></div>
+        </div>
+        <div class="preview-photos-grid">
+          ${photosHtml}
+        </div>
+
+        <div class="report-section-title">5. 發生地點地圖</div>
+        ${mapEmbedHtml(d.location && d.location.lat, d.location && d.location.lng, typeof d.location === 'string' ? d.location : (d.location && d.location.address), 180)}
+      `;
+
+      document.getElementById('pDataArea').innerHTML = html;
+      
+      const btnsArea = document.querySelector('#previewOverlay .preview-btns');
+      btnsArea.innerHTML = `
+        <button class="p-btn" style="background:#e0f2fe; color:#0284c7;" onclick="window.editRecord('${d.id}')">✏️ 編輯</button>
+        <button class="p-btn p-btn-ok" style="background:#0284c7;" onclick="document.getElementById('previewOverlay').style.display='none'">關閉檢視</button>
+      `;
+      
+      document.getElementById('previewOverlay').style.display = 'flex';
+    };
+
+    // =========================================
+    // ★ 編輯模式：把紀錄載入「原本的表單與人體圖」直接修改
+    // =========================================
+    function setOtherField(checkboxId, labelId, hiddenId, val) {
+      const cb = document.getElementById(checkboxId);
+      const lab = document.getElementById(labelId);
+      const hid = document.getElementById(hiddenId);
+      if(!lab.hasAttribute('data-default')) lab.setAttribute('data-default', lab.innerText);
+      cb.checked = true;
+      hid.value = val;
+      lab.innerText = val ? ("其他: " + val) : lab.getAttribute('data-default');
+    }
+
+    function applyCheckGroup(name, str, otherCbId, otherLabelId, otherHiddenId) {
+      const form = document.getElementById('ambulanceForm');
+      const boxes = Array.from(form.querySelectorAll(`input[name="${name}"]`));
+      boxes.forEach(b => b.checked = false);
+      const known = new Set(boxes.map(b => b.value));
+      let other = null;
+      String(str || '').split(/,\s*/).forEach(p => {
+        p = p.trim();
+        if(!p || p === '無') return;
+        if(p.startsWith('其他:')) {
+          other = p.slice(3).trim();
+          if(other === '未註明') other = '';
+          return;
+        }
+        if(known.has(p) && p !== '其他') {
+          boxes.find(b => b.value === p).checked = true;
+          return;
+        }
+        if(other !== null) other = other ? (other + ', ' + p) : p;
+      });
+      if(other !== null) setOtherField(otherCbId, otherLabelId, otherHiddenId, other);
+    }
+
+    function resetFormUI() {
+      document.querySelectorAll('.field-error').forEach(e => e.classList.remove('field-error'));
+      document.getElementById('ambulanceForm').reset();
+      window.compressedImagesArray = [];
+      renderImagePreviews();
+
+      const gpsBtn = document.getElementById('gpsBtn');
+      gpsBtn.innerHTML = "📍定位"; gpsBtn.classList.remove('success');
+
+      document.querySelectorAll('.scene-chip').forEach(label => {
+        if(label.hasAttribute('data-default')) label.innerText = label.getAttribute('data-default');
+      });
+      document.querySelectorAll('input[type="hidden"]').forEach(input => input.value = "");
+      window.clearVitalsOther();
+
+      selectedPartsData = []; window.updateInjuredDisplay();
+      document.querySelectorAll('.body-zone').forEach(el => el.classList.remove('active'));
+
+      currentStep = 0; window.updateWizard();
+      setNowTime();
+      lastAutoAddress = '';
+      updateGpsMap();
+    }
+
+    function enterEditUI(label) {
+      document.getElementById('editModeText').innerText = "✏️ 編輯中：" + label;
+      document.getElementById('editModeBar').classList.add('active');
+      document.getElementById('submitBtn').innerText = "儲存修改";
+    }
+
+    function exitEditUI() {
+      editingId = null;
+      document.getElementById('editModeBar').classList.remove('active');
+      document.getElementById('submitBtn').innerText = "確認上傳";
+    }
+
+    window.editRecord = function(id) {
+      const d = allRecordsData.find(r => r.id === id);
+      if(!d) { window.showNotice('error', '找不到紀錄', '找不到這筆紀錄'); return; }
+
+      resetFormUI();
+      editingId = id;
+
+      const P = d.patient || {}, L = d.location || {}, S = d.scene || {}, T = d.treatment || {}, F = d.followUp || {};
+      const form = document.getElementById('ambulanceForm');
+      const setv = (n, v) => { const el = form.elements[n]; if(el) el.value = (v === null || v === undefined) ? '' : v; };
+
+      // 時間（統一成 yyyy-mm-dd HH:MM）
+      const ct = parseCaseTime(d.caseTime);
+      document.getElementById('caseTimeInput').value = ct.date ? (ct.date + ' ' + (ct.time || '00:00')) : (d.caseTime || '');
+      document.getElementById('headerTime').innerText = ct.date || (d.caseTime || '');
+
+      setv('personnel', d.personnel === '未填' ? '' : d.personnel);
+      setv('location', typeof d.location === 'string' ? d.location : L.address);
+      setv('gps_lat', L.lat); setv('gps_lng', L.lng);
+      if(L.lat && L.lng) {
+        const gpsBtn = document.getElementById('gpsBtn');
+        gpsBtn.innerHTML = "✅ 已定位"; gpsBtn.classList.add('success');
+      }
+      updateGpsMap();
+      setv('pName', P.name === '不詳' ? '' : P.name);
+      setv('gender', P.gender || '男');
+      setv('age', P.age === '無' ? '' : P.age);
+      setv('armband', P.armband === '無' ? '' : P.armband);
+      setv('pPhone', P.phone === '無' ? '' : P.phone);
+      setv('mainComplaint', S.mainComplaint);
+      setv('handoverInfo', F.handoverInfo);
+
+      applyCheckGroup('problems', S.problems, 'problemOtherCheckbox', 'problemOtherLabel', 'problemOtherValue');
+      applyCheckGroup('treatment', T.actions, 'treatmentOtherCheckbox', 'treatmentOtherLabel', 'treatmentOtherValue');
+
+      // 生命徵象
+      const pv = F.postVitals || '意識清楚生命徵象穩定';
+      if(pv === '意識清楚生命徵象穩定') {
+        document.querySelector('input[name="postVitals"][value="意識清楚生命徵象穩定"]').checked = true;
+      } else {
+        document.getElementById('vitalsOtherRadio').checked = true;
+        document.getElementById('postVitalsOtherText').value = pv;
+        document.getElementById('vitalsOtherLabel').innerText = "其他: " + pv;
+      }
+
+      // 人體圖標記（可直接在圖上點選增減）
+      selectedPartsData = JSON.parse(JSON.stringify(T.injuredParts || []));
+      document.querySelectorAll('.body-zone').forEach(z => {
+        if(selectedPartsData.some(i => i.part === z.dataset.part)) z.classList.add('active');
+      });
+      window.updateInjuredDisplay();
+
+      // 照片
+      window.compressedImagesArray = Array.isArray(d.photos) ? d.photos.slice(0, 2) : [];
+      renderImagePreviews();
+
+      enterEditUI((P.name && P.name !== '不詳') ? P.name : '無名氏');
+
+      document.getElementById('previewOverlay').style.display = 'none';
+      document.getElementById('adminConsoleOverlay').style.display = 'none';
+      currentStep = 0; window.updateWizard();
+    };
+
+    window.cancelEdit = async function() {
+      if(!(await window.showConfirm("放棄修改？", "放棄這次修改並回到主控台？", "放棄修改"))) return;
+      exitEditUI();
+      resetFormUI();
+      window.openAdminConsole();
+    };
+
+    window.deleteEditingRecord = async function() {
+      if(!editingId) return;
+      if(!(await window.showConfirm("刪除這筆紀錄？", "確定要刪除這筆救護紀錄嗎？此動作無法復原。", "刪除"))) return;
+      try {
+        document.getElementById('loading').style.display = 'flex';
+        await deleteDoc(doc(db, "medical_records", editingId));
+        document.getElementById('loading').style.display = 'none';
+        window.showNotice('success', '已刪除', '這筆救護紀錄已刪除');
+        exitEditUI();
+        resetFormUI();
+        window.openAdminConsole();
+      } catch (e) {
+        document.getElementById('loading').style.display = 'none';
+        window.showNotice('error', '刪除失敗', e.message);
+      }
+    };
+
+    // ★ 自訂提示（取代內建 alert）：成功 2.2 秒自動關閉，錯誤需按確定
+    let noticeTimer = null;
+    window.closeNotice = function() {
+      clearTimeout(noticeTimer);
+      document.getElementById('noticeOverlay').style.display = 'none';
+    };
+    window.showNotice = function(type, title, msg) {
+      const icons = { success: '✓', error: '✕', info: 'ℹ' };
+      clearTimeout(noticeTimer);
+      document.getElementById('noticeCard').className = 'notice-card ' + type;
+      document.getElementById('noticeIcon').innerText = icons[type] || 'ℹ';
+      document.getElementById('noticeTitle').innerText = title || '';
+      document.getElementById('noticeMsg').innerText = msg || '';
+      document.getElementById('noticeOverlay').style.display = 'flex';
+      if (type === 'success') noticeTimer = setTimeout(window.closeNotice, 2200);
+    };
+
+    // ★ 自訂確認視窗（取代內建 confirm），回傳 Promise<boolean>
+    let confirmResolver = null;
+    window.resolveConfirm = function(ok) {
+      document.getElementById('confirmOverlay').style.display = 'none';
+      if (confirmResolver) { const r = confirmResolver; confirmResolver = null; r(ok); }
+    };
+    window.showConfirm = function(title, msg, okText) {
+      return new Promise(resolve => {
+        confirmResolver = resolve;
+        document.getElementById('confirmTitle').innerText = title || '請確認';
+        document.getElementById('confirmMsg').innerText = msg || '';
+        document.getElementById('confirmOkBtn').innerText = okText || '確定';
+        document.getElementById('confirmOverlay').style.display = 'flex';
+      });
+    };
+
+    // 大圖：切換 傷情圖 / 現場照片
+    window.setCardMedia = function(btn, mode) {
+      const card = btn.closest('.cc-card');
+      if (!card) return;
+      const th = card.querySelector('.cc-thumb');
+      th.classList.toggle('show-photo', mode === 'photo');
+      card.querySelectorAll('.cc-media-tabs button').forEach(b => b.classList.toggle('active', b.dataset.m === mode));
+    };
+
+    window.finalSubmit = async function() {
+      const fd = new FormData(document.getElementById('ambulanceForm'));
+      document.getElementById('previewOverlay').style.display = 'none';
+      document.getElementById('loading').style.display = 'flex';
+
+      let finalVitals = fd.get('postVitals');
+      if(finalVitals === "其他") {
+        finalVitals = document.getElementById('postVitalsOtherText').value.trim() || "未填寫";
+      }
+
+      const recordData = {
+        timestamp: serverTimestamp(),
+        caseTime: fd.get('caseTime'),
+        personnel: fd.get('personnel') || '未填',
+        location: {
+          address: fd.get('location') || '',
+          lat: fd.get('gps_lat') || null,
+          lng: fd.get('gps_lng') || null
+        },
+        patient: {
+          name: fd.get('pName') || '不詳',
+          gender: fd.get('gender'),
+          age: String(fd.get('age') || '').trim() || '無',
+          armband: String(fd.get('armband') || '').trim() || '無',
+          phone: String(fd.get('pPhone') || '').trim() || '無'
+        },
+        scene: {
+          problems: getCheckedValuesWithHidden('problems', 'problemOtherValue'),
+          mainComplaint: fd.get('mainComplaint') || ''
+        },
+        treatment: {
+          injuredParts: selectedPartsData,
+          actions: getCheckedValuesWithHidden('treatment', 'treatmentOtherValue')
+        },
+        followUp: {
+          postVitals: finalVitals,
+          handoverInfo: fd.get('handoverInfo') || ''
+        },
+        photos: window.compressedImagesArray || []
+      };
+
+      try {
+        if(editingId) {
+          // ★ 編輯模式：更新原紀錄（保留原本的建立時間戳記）
+          delete recordData.timestamp;
+          recordData.updatedAt = serverTimestamp();
+          await updateDoc(doc(db, "medical_records", editingId), recordData);
+          window.showNotice('success', '更新完成', '救護紀錄已成功更新');
+
+          document.getElementById('loading').style.display = 'none';
+          exitEditUI();
+          resetFormUI();
+          window.openAdminConsole();
+        } else {
+          await addDoc(collection(db, "medical_records"), recordData);
+          window.showNotice('success', '上傳成功', '救護紀錄已成功送出');
+
+          document.getElementById('loading').style.display = 'none';
+          resetFormUI();
+        }
+      } catch (e) {
+        document.getElementById('loading').style.display = 'none';
+        window.showNotice('error', '上傳失敗', e.message);
+      }
+    };
+  </script>
+  </body>
+</html>
