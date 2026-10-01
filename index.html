@@ -343,8 +343,28 @@
       .cc-thumb.show-photo .cc-map { display: none; }
       .cc-thumb.show-photo .cc-pane-photo { display: flex; }
     </style>
+  <style id="authStyles">
+  input, textarea { -webkit-user-select: text; user-select: text; }
+  body:not(.is-admin) .admin-top-btn, body:not(.is-admin) .admin-console-btn { display: none !important; }
+  #gateOverlay { display: flex; position: fixed; inset: 0; z-index: 9800; background: linear-gradient(135deg,#fdfbfb,#ebedee); align-items: center; justify-content: center; padding: 20px; }
+  .gate-box { background: #fff; width: 100%; max-width: 360px; border-radius: 24px; padding: 26px 22px; box-shadow: 0 20px 40px rgba(0,0,0,.15); text-align: center; }
+  .gate-box h2 { margin: 0 0 6px; color: #D65A68; font-size: 20px; }
+  .gate-box p { font-size: 13px; color: #666; line-height: 1.6; margin: 6px 0 14px; }
+  .gate-box input { width: 100%; padding: 13px; margin-bottom: 10px; border: 1px solid #eee; border-radius: 12px; background: #f9f9f9; font-size: 16px; text-align: left; outline: none; }
+  .gate-btn { width: 100%; border: none; border-radius: 14px; padding: 13px; font-size: 16px; font-weight: 600; color: #fff; background: linear-gradient(135deg,#D65A68,#E57E86); cursor: pointer; margin-top: 4px; }
+  .gate-btn.sec { background: #eee; color: #666; }
+  .staff-item { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; margin-bottom: 6px; font-size: 12px; line-height: 1.6; color: #334155; }
+  .staff-item .st-btns { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 6px; }
+  .staff-item button { border: none; border-radius: 6px; padding: 5px 9px; font-size: 11px; font-weight: bold; color: #fff; cursor: pointer; }
+  .st-ok { background: #16a34a; } .st-no { background: #f59e0b; } .st-adm { background: #0284c7; } .st-del { background: #ef4444; }
+  .st-tag { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 10px; font-weight: bold; }
+  .st-tag.pending { background: #fef3c7; color: #b45309; } .st-tag.approved { background: #dcfce7; color: #166534; }
+  .st-tag.rejected { background: #fee2e2; color: #b91c1c; } .st-tag.admin { background: #dbeafe; color: #1d4ed8; }
+</style>
   </head>
   <body>
+
+  <div id="gateOverlay"><div class="gate-box" id="gateBox"><h2>驗證中…</h2><p>正在確認您的 LINE 身分</p></div></div>
 
   <div class="app-container">
 
@@ -710,6 +730,7 @@
         <div class="console-tab active" id="cTab-list" onclick="window.switchConsoleTab('list')">📋 案件清單</div>
         <div class="console-tab" id="cTab-stats" onclick="window.switchConsoleTab('stats')">📈 數據分析儀表板</div>
         <div class="console-tab" id="cTab-map" onclick="window.switchConsoleTab('map')">🗺 傷患地圖</div>
+        <div class="console-tab" id="cTab-staff" onclick="window.switchConsoleTab('staff')">👥 人員審核 <span id="staffBadge"></span></div>
       </div>
 
       <!-- 分頁 1: 案件清單 -->
@@ -758,6 +779,17 @@
         <div id="mapLegend" class="map-legend"></div>
       </div>
 
+      <!-- 分頁 4: 人員身分與權限審核 -->
+      <div class="console-panel" id="panel-staff">
+  <div class="view-mode-bar" id="staffFilterBar">
+    <button type="button" data-f="pending" class="active" onclick="window.setStaffFilter('pending')">待審核</button>
+    <button type="button" data-f="approved" onclick="window.setStaffFilter('approved')">已通過</button>
+    <button type="button" data-f="rejected" onclick="window.setStaffFilter('rejected')">未通過</button>
+    <button type="button" data-f="all" onclick="window.setStaffFilter('all')">全部</button>
+  </div>
+  <div id="staffList" style="flex:1; overflow-y:auto;">載入中...</div>
+</div>
+
     </div>
   </div>
 
@@ -767,7 +799,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js";
-    import { initializeFirestore, persistentLocalCache, collection, addDoc, getDocs, doc, getDoc, setDoc, deleteDoc, updateDoc, query, orderBy, serverTimestamp } 
+    import { initializeFirestore, persistentLocalCache, collection, addDoc, getDocs, doc, getDoc, setDoc, deleteDoc, updateDoc, runTransaction, query, orderBy, serverTimestamp } 
     from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     const firebaseConfig = {
@@ -779,7 +811,7 @@
       appId: "1:1002268658683:web:739adcd7819f8c9393595e",
       measurementId: "G-1Z55WR53W7"
     };
-    const MY_LIFF_ID = "2011820105-6oXAxIEi"; 
+    const MY_LIFF_ID = "YOUR_LIFF_ID_HERE"; 
 
     const app = initializeApp(firebaseConfig);
     const analytics = getAnalytics(app);
@@ -827,13 +859,7 @@
       await loadBodyConfigFromFirebase();
       initAdminEditor();
 
-      liff.init({ liffId: MY_LIFF_ID }).then(() => {
-        if (liff.isLoggedIn()) {
-          liff.getProfile().then(profile => {
-            document.getElementById('personnelInput').value = profile.displayName;
-          });
-        }
-      }).catch(() => {});
+      startGate();
     };
 
     // ★ 地圖嵌入（有座標用座標，沒有就用地址搜尋；不需 API Key）
@@ -2149,6 +2175,155 @@
         window.showNotice('error', '上傳失敗', e.message);
       }
     };
+  
+// ================= 身分驗證 + 人員審核 =================
+let myUid = null, myLineName = '', myProfile = null, isAdmin = false;
+let staffList = [], staffFilter = 'pending';
+const gateEl = document.getElementById('gateOverlay'), gateBox = document.getElementById('gateBox');
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const maskId = id => id ? id.slice(0, 3) + '****' + id.slice(-3) : '';
+function showGate(html) { gateBox.innerHTML = html; gateEl.style.display = 'flex'; }
+
+// 身分證格式 + 檢查碼（A123456789 型）
+function validTwId(id) {
+  if (!/^[A-Z][12]\d{8}$/.test(id)) return false;
+  const L = 'ABCDEFGHJKLMNPQRSTUVXYWZIO', n = L.indexOf(id[0]) + 10;
+  let sum = Math.floor(n / 10) + (n % 10) * 9;
+  for (let i = 1; i <= 8; i++) sum += parseInt(id[i], 10) * (9 - i);
+  return (10 - sum % 10) % 10 === parseInt(id[9], 10);
+}
+
+async function startGate() {
+  try {
+    await liff.init({ liffId: MY_LIFF_ID });
+    if (!liff.isLoggedIn()) { liff.login(); return; }
+    const p = await liff.getProfile();
+    myUid = p.userId; myLineName = p.displayName;
+  } catch (e) {
+    showGate('<h2>無法驗證</h2><p>請從 LINE 內開啟此頁面。</p>');
+    return;
+  }
+  refreshGate();
+}
+
+window.refreshGate = async function() {
+  try {
+    const snap = await getDoc(doc(db, 'staff_profiles', myUid));
+    if (!snap.exists()) return showRegisterForm();
+    const d = snap.data();
+    if (d.status === 'approved') {
+      myProfile = d; isAdmin = d.role === 'admin' || d.founder === true;
+      document.body.classList.toggle('is-admin', isAdmin);
+      document.getElementById('personnelInput').value = d.realName;
+      gateEl.style.display = 'none';
+      if (isAdmin) updateStaffBadge();
+    } else if (d.status === 'rejected') {
+      showGate('<h2>審核未通過</h2><p>您的資料未通過核對，請聯絡團隊管理員。</p><button class="gate-btn sec" onclick="window.refreshGate()">重新查詢</button>');
+    } else {
+      showGate('<h2>等待審核中</h2><p>' + esc(d.realName) + ' 您好，已收到您的資料。<br>管理員核對後即可使用，請稍後重新查詢。</p><button class="gate-btn" onclick="window.refreshGate()">重新查詢</button>');
+    }
+  } catch (e) {
+    showGate('<h2>連線失敗</h2><p>' + esc(e.message) + '</p><button class="gate-btn" onclick="window.refreshGate()">重試</button>');
+  }
+};
+
+function showRegisterForm() {
+  showGate(`<h2>人員身分登記</h2>
+    <p>LINE：${esc(myLineName)}<br>請輸入<b>本名</b>與<b>身分證字號</b>，經管理員核對後才可使用。資料僅供團隊身分確認。</p>
+    <input id="regName" type="text" placeholder="本名（與身分證相同）" autocomplete="off">
+    <input id="regId" type="text" placeholder="身分證字號" maxlength="10" autocomplete="off" style="text-transform:uppercase;">
+    <button class="gate-btn" onclick="window.submitRegistration()">送出審核</button>`);
+}
+
+window.submitRegistration = async function() {
+  const name = document.getElementById('regName').value.trim();
+  const idn = document.getElementById('regId').value.trim().toUpperCase();
+  if (name.length < 2) return window.showNotice('error', '請輸入本名', '');
+  if (!validTwId(idn)) return window.showNotice('error', '身分證字號格式不正確', '請重新確認');
+  try {
+    // 第一位登記者 = 創始管理員（自動通過、永久管理員）；用交易避免兩人同時搶第一
+    const empty = (await getDocs(collection(db, 'staff_profiles'))).empty;
+    const metaRef = doc(db, 'system_configs', 'founder');
+    await runTransaction(db, async tx => {
+      const founder = empty && !(await tx.get(metaRef)).exists();
+      if (founder) tx.set(metaRef, { uid: myUid, createdAt: serverTimestamp() });
+      tx.set(doc(db, 'staff_profiles', myUid), {
+        lineName: myLineName, realName: name, idNumber: idn,
+        status: founder ? 'approved' : 'pending', role: founder ? 'admin' : 'member',
+        founder: founder, createdAt: serverTimestamp()
+      });
+    });
+    refreshGate();
+  } catch (e) { window.showNotice('error', '送出失敗', e.message); }
+};
+
+// ---- 主控台：人員審核 ----
+async function loadStaff() {
+  const box = document.getElementById('staffList');
+  box.innerHTML = '載入中...';
+  try {
+    const snap = await getDocs(collection(db, 'staff_profiles'));
+    staffList = []; snap.forEach(s => staffList.push({ uid: s.id, ...s.data() }));
+    updateStaffBadge(); renderStaff();
+  } catch (e) { box.innerHTML = '<div style="color:red;padding:16px;">載入失敗：' + esc(e.message) + '</div>'; }
+}
+function updateStaffBadge() {
+  const b = document.getElementById('staffBadge');
+  const n = staffList.filter(s => s.status === 'pending').length;
+  b.innerHTML = n ? '<span style="background:#ef4444;color:#fff;border-radius:9px;padding:0 6px;font-size:10px;">' + n + '</span>' : '';
+}
+window.setStaffFilter = function(f) {
+  staffFilter = f;
+  document.querySelectorAll('#staffFilterBar button').forEach(b => b.classList.toggle('active', b.dataset.f === f));
+  renderStaff();
+};
+function renderStaff() {
+  const idCount = {}; staffList.forEach(s => idCount[s.idNumber] = (idCount[s.idNumber] || 0) + 1);
+  const rows = staffList.filter(s => staffFilter === 'all' || s.status === staffFilter);
+  document.getElementById('staffList').innerHTML = rows.length ? rows.map(s => {
+    const me = s.uid === myUid, fd = s.founder === true;
+    return `<div class="staff-item">
+      <b>${esc(s.realName)}</b>
+      <span class="st-tag ${s.status}">${{pending:'待審核',approved:'已通過',rejected:'未通過'}[s.status] || s.status}</span>
+      ${fd ? '<span class="st-tag admin">創始管理員</span>' : (s.role === 'admin' ? '<span class="st-tag admin">管理員</span>' : '')}${me ? ' (我)' : ''}<br>
+      LINE：${esc(s.lineName)}<br>身分證：${esc(s.idNumber)}
+      ${idCount[s.idNumber] > 1 ? '<br><b style="color:#ef4444;">⚠ 此身分證已被多個 LINE 帳號登記</b>' : ''}
+      <div class="st-btns">
+        ${s.status !== 'approved' ? `<button class="st-ok" onclick="window.staffAction('${s.uid}','approve')">✔ 通過</button>` : ''}
+        ${s.status !== 'rejected' && !me && !fd ? `<button class="st-no" onclick="window.staffAction('${s.uid}','reject')">✖ 不通過</button>` : ''}
+        ${s.status === 'approved' && s.role !== 'admin' ? `<button class="st-adm" onclick="window.staffAction('${s.uid}','makeAdmin')">設為管理員</button>` : ''}
+        ${s.role === 'admin' && !me && !fd ? `<button class="st-adm" onclick="window.staffAction('${s.uid}','removeAdmin')">取消管理員</button>` : ''}
+        ${!me && !fd ? `<button class="st-del" onclick="window.staffAction('${s.uid}','delete')">刪除</button>` : ''}
+      </div></div>`;
+  }).join('') : '<div style="text-align:center;padding:30px;color:#888;">沒有符合的人員</div>';
+}
+window.staffAction = async function(uid, act) {
+  if (!isAdmin) return;
+  const s = staffList.find(x => x.uid === uid); if (!s) return;
+  if (s.founder) { window.showNotice('error', '無法操作', '創始管理員為永久管理員，不能被修改或刪除'); return; }
+  const labels = { approve: '通過', reject: '不通過', makeAdmin: '設為管理員', removeAdmin: '取消管理員', delete: '刪除' };
+  if (!(await window.showConfirm(labels[act] + '？', s.realName + '（' + s.lineName + '）', labels[act]))) return;
+  const patch = {
+    approve: { status: 'approved' }, reject: { status: 'rejected', role: 'member' },
+    makeAdmin: { role: 'admin' }, removeAdmin: { role: 'member' }
+  }[act];
+  try {
+    if (act === 'delete') await deleteDoc(doc(db, 'staff_profiles', uid));
+    else await updateDoc(doc(db, 'staff_profiles', uid), { ...patch, reviewedAt: serverTimestamp(), reviewedBy: myProfile.realName });
+    await loadStaff();
+  } catch (e) { window.showNotice('error', '操作失敗', e.message); }
+};
+
+// 擴充分頁切換、並鎖住管理員功能
+const _switchTab = window.switchConsoleTab;
+window.switchConsoleTab = function(t) { _switchTab(t); if (t === 'staff') loadStaff(); };
+['openAdminConsole', 'toggleAdminMode'].forEach(n => {
+  const f = window[n];
+  window[n] = function(...a) {
+    if (!isAdmin) { window.showNotice('error', '權限不足', '僅管理員可使用此功能'); return; }
+    return f.apply(this, a);
+  };
+});
   </script>
   </body>
 </html>
