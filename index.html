@@ -393,7 +393,16 @@
       .preview-scroll-wrapper { padding: 12px 14px; padding-top: max(12px, env(safe-area-inset-top)); -webkit-overflow-scrolling: touch; }
       .preview-btns { height: auto; flex-shrink: 0; padding-bottom: max(10px, env(safe-area-inset-bottom)); background: #fff; }
       .preview-btns .p-btn { min-height: 54px; }
+
+      /* ★ 步驟編號 1234 / 完成變綠色 ★ */
+      .tab-item { display: flex; align-items: center; justify-content: center; gap: 4px; white-space: nowrap; padding: 8px 0; }
+      .step-num { display: inline-flex; align-items: center; justify-content: center; width: 17px; height: 17px; border-radius: 50%; background: #e5e7eb; color: #9ca3af; font-size: 11px; font-weight: 800; flex-shrink: 0; transition: all 0.3s; }
+      .tab-item.active .step-num { background: var(--ssc-primary); color: #fff; }
+      .tab-item.done { color: #16a34a; }
+      .tab-item.done .step-num { background: #16a34a; color: #fff; }
+      .tab-item.done.active { color: #16a34a; }
     </style>
+
   </head>
   <body>
 
@@ -466,10 +475,10 @@
         <div class="header-sub" id="headerTime">--:--</div>
       </div>
       <div class="tabs">
-        <div class="tab-item active" id="tabHead-basic">基本資料</div>
-        <div class="tab-item" id="tabHead-scene">現場狀況</div>
-        <div class="tab-item" id="tabHead-treatment">急救處置</div>
-        <div class="tab-item" id="tabHead-vitals">後續交班</div>
+        <div class="tab-item active" id="tabHead-basic"><span class="step-num">1</span>基本資料</div>
+        <div class="tab-item" id="tabHead-scene"><span class="step-num">2</span>現場狀況</div>
+        <div class="tab-item" id="tabHead-treatment"><span class="step-num">3</span>急救處置</div>
+        <div class="tab-item" id="tabHead-vitals"><span class="step-num">4</span>後續交班</div>
       </div>
     </div>
 
@@ -659,7 +668,7 @@
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
               拍照 / 選擇照片 (最多2張)
             </label>
-            <input type="file" id="imageUpload" accept="image/*" capture="environment" multiple style="display:none;" onchange="window.handleImageUpload(event)">
+            <input type="file" id="imageUpload" accept="image/*" multiple style="display:none;" onchange="window.handleImageUpload(event)">
             
             <div id="imagePreviewContainer" class="img-preview-box"></div>
             <p style="font-size:11px; color:#999; margin-top:12px;">※ 系統會自動壓縮照片以節省網路流量</p>
@@ -934,6 +943,7 @@
 
     const steps = ['basic', 'scene', 'treatment', 'vitals'];
     let currentStep = 0;
+    let completedSteps = new Set();   // ★ 已完成的步驟（顯示綠色）
     let allRecordsData = []; 
     let availableDates = []; 
     let currentDateIndex = 0; 
@@ -953,6 +963,9 @@
       document.getElementById('tab-' + steps[currentStep]).classList.add('active');
       document.querySelectorAll('.tab-item').forEach((el, index) => {
         if(index === currentStep) el.classList.add('active'); else el.classList.remove('active');
+        el.classList.toggle('done', completedSteps.has(index));
+        const num = el.querySelector('.step-num');
+        if(num) num.innerText = completedSteps.has(index) ? '✓' : String(index + 1);
       });
       document.getElementById('prevBtn').style.display = (currentStep === 0) ? 'none' : 'block';
       if(currentStep === steps.length - 1) {
@@ -964,7 +977,7 @@
       }
       document.querySelector('.content-scroll-area').scrollTop = 0;
     };
-    window.nextStep = function() { if(currentStep < steps.length - 1) { if(!checkStep(currentStep)) return; currentStep++; window.updateWizard(); } };
+    window.nextStep = function() { if(currentStep < steps.length - 1) { if(!checkStep(currentStep)) return; completedSteps.add(currentStep); currentStep++; window.updateWizard(); } };
     window.prevStep = function() { if(currentStep > 0) { currentStep--; window.updateWizard(); } };
 
     function setNowTime() {
@@ -2281,6 +2294,7 @@
       selectedPartsData = []; window.updateInjuredDisplay();
       document.querySelectorAll('.body-zone').forEach(el => el.classList.remove('active'));
 
+      completedSteps.clear();
       currentStep = 0; window.updateWizard();
       setNowTime();
       lastAutoAddress = '';
