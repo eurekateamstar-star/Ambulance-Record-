@@ -12,8 +12,6 @@
     <!-- 傷患地圖（Leaflet + OpenStreetMap） -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.js"></script>
     <!-- 引入 LINE LIFF SDK -->
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     
@@ -278,6 +276,11 @@
       .map-legend .lg-item { cursor: pointer; user-select: none; padding: 2px 4px; border-radius: 4px; }
       .map-legend .lg-item.off { opacity: 0.35; text-decoration: line-through; }
       .map-legend .lg-note { color: #94a3b8; }
+      .map-tools { margin-top: 6px; display: flex; gap: 6px; }
+      .map-tools button { border: 1px solid #bae6fd; background: #fff; color: #0369a1; border-radius: 6px; padding: 5px 10px; font-size: 12px; font-weight: bold; cursor: pointer; }
+      .map-tools button.active { background: #0284c7; color: #fff; border-color: #0284c7; }
+      .route-arrow div { font-size: 11px; line-height: 14px; text-align: center; width: 14px; height: 14px; text-shadow: 0 0 2px #fff, 0 0 2px #fff; }
+      #mapRouteLegend i { display: inline-block; width: 14px; height: 3px; margin-right: 3px; vertical-align: middle; border-radius: 2px; }
       .mc-icon div { width: 34px; height: 34px; border-radius: 50%; background: rgba(2,132,199,0.88); color: #fff; font-weight: bold; font-size: 13px; display: flex; align-items: center; justify-content: center; border: 3px solid rgba(255,255,255,0.85); box-shadow: 0 2px 6px rgba(0,0,0,0.3); box-sizing: border-box; }
       .view-mode-bar button.active { background: #0284c7; color: #fff; border-color: #0284c7; }
       .view-grid { display: grid; gap: 8px; align-content: start; grid-auto-rows: max-content; }
@@ -927,9 +930,11 @@
           <button type="button" data-scope="range" onclick="window.setMapScope('range')">自訂日期</button>
         </div>
         <div id="mapScopeOpts" class="map-scope-opts" style="display:none;"></div>
+        <div class="map-tools"><button type="button" id="mapLineBtn" class="active" onclick="window.toggleMapLine()">〰 時間連線</button></div>
         <div id="mapStatus" style="font-size:11px; padding:4px 8px; margin-top:6px; background:#e0f2fe; color:#0369a1; font-weight:bold;">尚未載入</div>
         <div id="bigMap"></div>
         <div id="mapLegend" class="map-legend"></div>
+        <div id="mapRouteLegend" class="map-legend"></div>
       </div>
 
       <!-- 分頁 4: 人員身分與權限審核 -->
@@ -1854,7 +1859,8 @@
     };
 
     const CAT_COLORS = { '起水泡問題': '#0ea5e9', '抽筋/痠痛': '#8b5cf6', '跌倒/擦摔': '#f59e0b', '冷熱急症': '#ef4444', '車禍': '#111827', '肢體無力/暈眩': '#10b981', '創傷/割燙傷': '#ec4899', '其他': '#64748b' };
-    let bigMap = null, markerLayer = null, mapScope = 'all', geoRunId = 0, mapKey = '';
+    let bigMap = null, markerLayer = null, routeLayer = null, mapScope = 'all', geoRunId = 0, mapKey = '', mapLine = true;
+    const ROUTE_COLORS = ['#e11d48', '#2563eb', '#16a34a', '#d97706', '#9333ea', '#0891b2', '#db2777', '#4d7c0f'];
     let mapDay = '', mapYear = '', mapFrom = '', mapTo = '';
     let mapMarkers = [];              // 目前地圖上的標記 { m: 標記, cat: 類別 }
     const hiddenCats = new Set();     // 圖例點掉（隱藏）的類別
@@ -1911,9 +1917,43 @@
       if (!markerLayer) return;
       markerLayer.clearLayers();
       const visible = mapMarkers.filter(x => !hiddenCats.has(x.cat)).map(x => x.m);
-      if (markerLayer.addLayers) markerLayer.addLayers(visible); else visible.forEach(m => markerLayer.addLayer(m));
+      visible.forEach(m => markerLayer.addLayer(m));
+      drawRoute();
       if (doFit && visible.length) bigMap.fitBounds(L.latLngBounds(visible.map(m => m.getLatLng())), { padding: [30, 30], maxZoom: 16 });
     }
+
+    // 依時間順序連線（每一天一條線、顏色不同，線上用箭頭標示前進方向）
+    function drawRoute() {
+      if (!routeLayer) return;
+      routeLayer.clearLayers();
+      const legendEl = document.getElementById('mapRouteLegend');
+      document.getElementById('mapLineBtn').classList.toggle('active', mapLine);
+      if (!mapLine) { legendEl.innerHTML = ''; return; }
+      const byDay = {};
+      mapMarkers.filter(x => !hiddenCats.has(x.cat)).forEach(x => {
+        const day = x.d.caseTimeNormalized || '未註明日期';
+        (byDay[day] = byDay[day] || []).push(x);
+      });
+      const days = Object.keys(byDay).sort();
+      const legend = [];
+      days.forEach((day, i) => {
+        const color = ROUTE_COLORS[i % ROUTE_COLORS.length];
+        const list = byDay[day].sort((a, b) => String(a.d.sortKey || '').localeCompare(String(b.d.sortKey || '')));
+        const pts = list.map(x => x.m.getLatLng());
+        legend.push(`<span><i style="background:${color};"></i>${day.slice(5) || day}（${list.length}）</span>`);
+        if (pts.length < 2) return;
+        L.polyline(pts, { color: color, weight: 2.5, opacity: 0.85, dashArray: '6 4', pane: 'routePane', interactive: false }).addTo(routeLayer);
+        for (let j = 0; j < pts.length - 1; j++) {
+          const a = pts[j], b = pts[j + 1];
+          if (a.distanceTo(b) < 300) continue;     // 太近的兩點不畫箭頭，避免擠在一起
+          const mid = L.latLng((a.lat + b.lat) / 2, (a.lng + b.lng) / 2);
+          const deg = Math.atan2((b.lng - a.lng) * Math.cos(mid.lat * Math.PI / 180), b.lat - a.lat) * 180 / Math.PI;
+          L.marker(mid, { interactive: false, keyboard: false, icon: L.divIcon({ className: 'route-arrow', html: `<div style="transform:rotate(${deg}deg); color:${color};">▲</div>`, iconSize: [14, 14] }) }).addTo(routeLayer);
+        }
+      });
+      legendEl.innerHTML = days.length ? '<span class="lg-note">連線（依時間，每日一條）：</span>' + legend.join('') : '';
+    }
+    window.toggleMapLine = function() { mapLine = !mapLine; drawRoute(); };
 
     // 依目前選擇的範圍，產生選單（日期 / 年度 / 自訂區間）
     function syncMapScopeUI() {
@@ -2003,13 +2043,9 @@
         emap.addTo(bigMap);
         L.control.layers({ '電子地圖': emap, '正射影像（衛星）': photo }, null, { position: 'topright' }).addTo(bigMap);
         L.control.scale({ imperial: false }).addTo(bigMap);
-        // 標記太多時自動聚合成數字圓圈（放大後展開）
-        markerLayer = (L.markerClusterGroup)
-          ? L.markerClusterGroup({
-              showCoverageOnHover: false, maxClusterRadius: 38, spiderfyOnMaxZoom: true, disableClusteringAtZoom: 17,
-              iconCreateFunction: c => L.divIcon({ html: `<div>${c.getChildCount()}</div>`, className: 'mc-icon', iconSize: [34, 34] })
-            })
-          : L.layerGroup();
+        bigMap.createPane('routePane').style.zIndex = 390;   // 連線畫在點的下面
+        routeLayer = L.layerGroup().addTo(bigMap);
+        markerLayer = L.layerGroup();
         markerLayer.addTo(bigMap);
       }
       syncMapScopeUI();
@@ -2022,6 +2058,7 @@
 
       const runId = ++geoRunId;
       markerLayer.clearLayers();
+      routeLayer.clearLayers();
       mapMarkers = [];
 
       const locOf = d => (typeof d.location === 'string') ? { address: d.location } : (d.location || {});
@@ -2042,9 +2079,9 @@
         const problem = d.scene ? d.scene.problems : '';
         const cat = catOf(d);
         const color = CAT_COLORS[cat] || '#64748b';
-        const m = L.circleMarker([lat, lng], { radius: 8, color: color, weight: 2, fillColor: color, fillOpacity: approx ? 0.15 : 0.75 });
+        const m = L.circleMarker([lat, lng], { radius: 5, color: color, weight: 1.5, fillColor: color, fillOpacity: approx ? 0.2 : 0.7 });
         m.bindPopup(`<b>${pName}</b> ${armband}<br><span style="color:#D65A68; font-weight:bold;">${problem}</span><br>🕒 ${d.caseTimeNormalized || ''} ${d.caseTimeHM || ''}<br>📍 ${l.address || '(定位座標)'}${approx ? '<br><span style="color:#94a3b8;">依地址估算位置</span>' : ''}<br><a href="#" onclick="window.openDetailById('${d.id}'); return false;" style="color:#0284c7; font-weight:bold;">檢視紀錄 ›</a>`);
-        mapMarkers.push({ m: m, cat: cat });
+        mapMarkers.push({ m: m, cat: cat, d: d });
         if (!hiddenCats.has(cat)) markerLayer.addLayer(m);
         shown++;
       };
@@ -2070,6 +2107,7 @@
       };
       const fit = () => {
         const pts = mapMarkers.filter(x => !hiddenCats.has(x.cat)).map(x => x.m.getLatLng());
+        drawRoute();
         if (pts.length > 0) bigMap.fitBounds(L.latLngBounds(pts), { padding: [30, 30], maxZoom: 16 });
       };
       refreshStatus(0);
