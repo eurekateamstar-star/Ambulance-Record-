@@ -1241,7 +1241,10 @@
       const lat = document.getElementById('gps_lat').value;
       const lng = document.getElementById('gps_lng').value;
       if (lat && lng) {
-        box.innerHTML = mapEmbedHtml(lat, lng, '', 170);
+        // 離線時地圖打不開，改顯示座標文字
+        box.innerHTML = (navigator.onLine === false)
+          ? `<div style="font-size:12px; color:#475569; background:#f1f5f9; border-radius:8px; padding:10px; line-height:1.6;">📍 GPS 座標：<b>${Number(lat).toFixed(5)}, ${Number(lng).toFixed(5)}</b><br><span style="color:#94a3b8;">目前離線，地圖無法顯示（座標已記錄）</span></div>`
+          : mapEmbedHtml(lat, lng, '', 170);
         box.style.display = 'block';
       } else {
         box.innerHTML = '';
@@ -1254,10 +1257,24 @@
       const input = document.querySelector('input[name="location"]');
       const cur = input.value.trim();
       if (cur && cur !== lastAutoAddress) return; 
+
+      // 沒網路或轉換失敗：先填入 GPS 座標，欄位才不會是空的（連線後再按一次「定位」可轉成地址）
+      const useCoords = (msg) => {
+        const txt = 'GPS ' + Number(lat).toFixed(5) + ', ' + Number(lng).toFixed(5);
+        input.value = txt;
+        lastAutoAddress = txt;
+        const row = input.closest('.row');
+        if (row) row.classList.remove('field-error');
+        window.showNotice('info', msg, '已記錄 GPS 座標並先填入地點欄，可自行改成地址或地標；連線後再按一次「定位」可自動轉成地址。');
+      };
+      if (navigator.onLine === false) { useCoords('目前無網路'); return; }
+
       input.placeholder = '地址轉換中...';
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 6000);   // 網路太慢就放棄，不要卡住
       try {
         const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=zh-TW`;
-        const res = await fetch(url);
+        const res = await fetch(url, { signal: ctrl.signal });
         const j = await res.json();
         const a = j.address || {};
         const house = a.house_number ? (/^\d+$/.test(a.house_number) ? a.house_number + '號' : a.house_number) : '';
@@ -1271,28 +1288,39 @@
         const row = input.closest('.row');
         if (row) row.classList.remove('field-error');
       } catch (e) {
-        window.showNotice('info', '無法自動取得地址', '已記錄定位座標，請手動輸入地址或地標。');
+        useCoords('無法自動取得地址');
       } finally {
+        clearTimeout(timer);
         input.placeholder = '發生地址 (或地標)';
       }
     }
 
     window.getGPS = function() {
       const btn = document.getElementById('gpsBtn');
+      btn.classList.remove('success');
       btn.innerHTML = "定位中...";
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            document.getElementById('gps_lat').value = pos.coords.latitude;
-            document.getElementById('gps_lng').value = pos.coords.longitude;
-            btn.innerHTML = "✅ 已定位"; btn.classList.add('success');
-            updateGpsMap();
-            fillAddressFromGPS(pos.coords.latitude, pos.coords.longitude);
-          },
-          (err) => { btn.innerHTML = "❌ 失敗"; window.showNotice('error', '定位失敗', '無法獲取定位，請確認已開啟定位權限。'); },
-          { enableHighAccuracy: true, timeout: 8000 }
-        );
-      }
+      const fail = (err) => {
+        btn.innerHTML = "❌ 重試";
+        const denied = err && err.code === 1;
+        window.showNotice('error', '定位失敗', denied
+          ? '定位權限被拒絕，請到手機設定（或 LINE 的權限）允許定位後，再按一次「定位」。'
+          : '暫時抓不到定位訊號，請移到空曠處後再按一次「定位」。沒有網路時也能用 GPS，但可能需要較久。');
+      };
+      if (!navigator.geolocation) { fail(null); return; }
+      const onOk = (pos) => {
+        document.getElementById('gps_lat').value = pos.coords.latitude;
+        document.getElementById('gps_lng').value = pos.coords.longitude;
+        btn.innerHTML = "✅ 已定位"; btn.classList.add('success');
+        const row = btn.closest('.row');
+        if (row) row.classList.remove('field-error');
+        updateGpsMap();
+        fillAddressFromGPS(pos.coords.latitude, pos.coords.longitude);
+      };
+      // 先用高精度（直接讀 GPS 晶片，不需要網路），失敗或逾時再用一般精度重試一次
+      navigator.geolocation.getCurrentPosition(onOk, (e1) => {
+        if (e1 && e1.code === 1) { fail(e1); return; }
+        navigator.geolocation.getCurrentPosition(onOk, fail, { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 });
+      }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
     };
 
     async function loadBodyConfigFromFirebase() {
@@ -1713,6 +1741,8 @@
 
       if (!filled(fd.get('personnel'))) add(0, '人員', boxOf('personnel'));
       if (!filled(fd.get('location'))) add(0, '地點', boxOf('location'));
+      // ★ 新增紀錄一定要按過「定位」取得 GPS 才能下一步（編輯舊紀錄不強制，避免舊資料無法儲存）
+      if (!editingId && !(filled(fd.get('gps_lat')) && filled(fd.get('gps_lng')))) add(0, '定位（請按地點旁的「定位」按鈕）', boxOf('location'));
       if (!filled(fd.get('pName'))) add(0, '患者姓名', boxOf('pName'));
 
       const problems = getCheckedValuesWithHidden('problems', 'problemOtherValue');
