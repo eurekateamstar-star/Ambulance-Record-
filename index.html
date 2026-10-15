@@ -354,6 +354,8 @@
       .user-row { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 8px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
       .user-row-header { display: flex; justify-content: space-between; align-items: flex-start; }
       .user-row-name { font-weight: bold; font-size: 14px; color: #1e293b; display: flex; flex-direction: column; }
+      .u-avatar { position: relative; width: 40px; height: 40px; border-radius: 50%; background: #cbd5e1; color: #fff; font-weight: bold; font-size: 16px; flex-shrink: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+      .u-avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
       .user-row-id { font-size: 11px; color: #64748b; font-family: monospace; margin-top: 2px; }
       .user-row-status { font-size: 11px; padding: 3px 6px; border-radius: 4px; font-weight: bold; }
       .status-pending { background: #fef08a; color: #854d0e; }
@@ -1034,6 +1036,18 @@
       }
     };
 
+    // ★ 背景同步 LINE 頭貼 / 顯示名稱到資料庫（不 await，不卡登入流程）
+    function syncLineProfile(profile, userData) {
+      try {
+        const updates = {};
+        const pic = profile.pictureUrl || '';
+        if (pic && pic !== userData.pictureUrl) updates.pictureUrl = pic;
+        if (profile.displayName && profile.displayName !== userData.lineDisplayName) updates.lineDisplayName = profile.displayName;
+        if (Object.keys(updates).length === 0) return;
+        updateDoc(doc(db, "users", profile.userId), updates).catch(e => console.warn('同步 LINE 頭貼失敗:', e));
+      } catch (e) { console.warn('同步 LINE 頭貼失敗:', e); }
+    }
+
     // 檢查使用者權限狀態 (有網路時執行)
     async function checkUserAuth(profile) {
       ['authLoading', 'authRegister', 'authPending', 'authRejected', 'authBanned'].forEach(id => document.getElementById(id).style.display = 'none');
@@ -1045,6 +1059,7 @@
         if (userSnap.exists()) {
           const userData = userSnap.data();
           currentUserData = userData;
+          syncLineProfile(profile, userData);
           
           if (userData.status === 'approved') {
             // ✅ 審核通過：進入系統，並把身分快取起來 (為了離線模式)
@@ -1100,6 +1115,7 @@
       if (userData.role === 'admin') {
         document.querySelector('.admin-top-btn').style.display = 'block';
         document.querySelector('.admin-console-btn').style.display = 'block';
+        if (!isOffline) fetchAdminUsers().catch(() => {});   // ★ 預先載入人員名單，開啟人員分頁時不用等
       } else {
         document.querySelector('.admin-top-btn').style.display = 'none';
         document.querySelector('.admin-console-btn').style.display = 'none';
@@ -1139,6 +1155,7 @@
           // ★ 被退回後重新送審：只更新資料，狀態回到待審核，清除退回原因
           await updateDoc(userRef, {
             lineDisplayName: currentUserProfile.displayName,
+            pictureUrl: currentUserProfile.pictureUrl || '',
             realName: realName,
             idCard: idCard,
             status: 'pending',
@@ -1154,6 +1171,7 @@
           await setDoc(userRef, {
             lineUserId: currentUserProfile.userId,
             lineDisplayName: currentUserProfile.displayName,
+            pictureUrl: currentUserProfile.pictureUrl || '',
             realName: realName,
             idCard: idCard,
             status: isFirstUser ? 'approved' : 'pending',
@@ -1810,7 +1828,7 @@
       document.getElementById('panel-' + tabName).classList.add('active');
       if(tabName === 'stats') renderStatsCharts();
       if(tabName === 'map') renderBigMap();
-      if(tabName === 'users') loadAdminUsers(); 
+      if(tabName === 'users') loadAdminUsers(true); 
     };
 
     const CAT_COLORS = { '起水泡問題': '#0ea5e9', '抽筋/痠痛': '#8b5cf6', '跌倒/擦摔': '#f59e0b', '冷熱急症': '#ef4444', '車禍': '#111827', '肢體無力/暈眩': '#10b981', '創傷/割燙傷': '#ec4899', '其他': '#64748b' };
@@ -2512,30 +2530,47 @@
     
     let adminUsersMap = {};   // 以 id 快速查人員資料，避免把資料塞進 onclick
 
-    // 載入所有使用者
-    async function loadAdminUsers() {
-      const listDiv = document.getElementById('adminUserList');
-      listDiv.innerHTML = '<div style="text-align:center; padding: 20px; color:#888;">正在載入人員名單...</div>';
-      
-      try {
-        const q = query(collection(db, "users"));
-        const snapshot = await getDocs(q);
-        
+    let adminUsersCache = null;     // ★ 人員名單快取（只存在記憶體，不寫入本機儲存）
+    let adminUsersInflight = null;
+
+    // 向資料庫抓取所有使用者並排序
+    function fetchAdminUsers(force) {
+      if (adminUsersInflight && !force) return adminUsersInflight;
+      const p = (async () => {
+        const snapshot = await getDocs(query(collection(db, "users")));
         const usersList = [];
         snapshot.forEach(docSnap => {
           usersList.push({ id: docSnap.id, ...docSnap.data() });
         });
-
         // 排序：待審核(pending)放最上面 -> 已核准(approved) -> 退回(rejected) -> 停權(banned)
         usersList.sort((a, b) => {
           const statusOrder = { 'pending': 1, 'approved': 2, 'rejected': 3, 'banned': 4 };
           return (statusOrder[a.status] || 99) - (statusOrder[b.status] || 99);
         });
+        adminUsersCache = usersList;
+        return usersList;
+      })();
+      adminUsersInflight = p;
+      const clear = () => { if (adminUsersInflight === p) adminUsersInflight = null; };
+      p.then(clear, clear);
+      return p;
+    }
 
+    // 載入所有使用者（useCache = true：先秒顯示快取，再背景更新）
+    async function loadAdminUsers(useCache) {
+      const listDiv = document.getElementById('adminUserList');
+      const hasCache = !!(useCache && adminUsersCache);
+      if (hasCache) {
+        renderAdminUsers(adminUsersCache);
+      } else {
+        listDiv.innerHTML = '<div style="text-align:center; padding: 20px; color:#888;">正在載入人員名單...</div>';
+      }
+
+      try {
+        const usersList = await fetchAdminUsers(!useCache);
         renderAdminUsers(usersList);
-
       } catch (e) {
-        listDiv.innerHTML = `<div style="color:red; padding:20px;">載入人員失敗: ${e.message}</div>`;
+        if (!hasCache) listDiv.innerHTML = `<div style="color:red; padding:20px;">載入人員失敗: ${e.message}</div>`;
       }
     }
 
@@ -2566,6 +2601,10 @@
           reasonHtml = `<div class="user-row-reason">${u.status === 'banned' ? '停權' : '退回'}原因：${esc(u.rejectReason)}</div>`;
         }
 
+        // LINE 頭貼（沒有或載入失敗時顯示姓名第一個字）
+        const initial = esc(String(u.realName || u.lineDisplayName || '?').trim().charAt(0) || '?');
+        const avatarHtml = `<div class="u-avatar"><span>${initial}</span>${u.pictureUrl ? `<img src="${esc(u.pictureUrl)}/large" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}</div>`;
+
         // 操作按鈕
         let actionBtns = '';
         if (u.status !== 'approved') {
@@ -2589,10 +2628,13 @@
         html += `
           <div class="user-row">
             <div class="user-row-header">
-              <div class="user-row-name">
-                <div>${esc(u.realName)} ${roleTag}</div>
-                <div class="user-row-id">${esc(u.idCard)}</div>
-                <div class="user-row-id">LINE: ${esc(u.lineDisplayName || '未知')}</div>
+              <div style="display:flex; gap:10px; align-items:flex-start; min-width:0;">
+                ${avatarHtml}
+                <div class="user-row-name">
+                  <div>${esc(u.realName)} ${roleTag}</div>
+                  <div class="user-row-id">${esc(u.idCard)}</div>
+                  <div class="user-row-id">LINE: ${esc(u.lineDisplayName || '未知')}</div>
+                </div>
               </div>
               <div>${statusTag}</div>
             </div>
