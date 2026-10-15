@@ -1927,10 +1927,46 @@
       if (doFit && visible.length) bigMap.fitBounds(L.latLngBounds(visible.map(m => m.getLatLng())), { padding: [30, 30], maxZoom: 16 });
     }
 
+    // 小圓點沿著每天的路線重複跑一遍（像重播當天行進過程）
+    let routeAnimToken = 0;
+    function startRouteDots(routes) {
+      const token = ++routeAnimToken;
+      const items = routes.map(r => {
+        const cum = [0];
+        for (let i = 1; i < r.pts.length; i++) cum.push(cum[i - 1] + r.pts[i - 1].distanceTo(r.pts[i]));
+        const total = cum[cum.length - 1];
+        if (!(total > 0)) return null;
+        const dot = L.circleMarker(r.pts[0], { radius: 6, color: '#fff', weight: 2.5, fillColor: r.color, fillOpacity: 1, interactive: false, pane: 'dotPane' }).addTo(routeLayer);
+        return { pts: r.pts, cum: cum, total: total, dot: dot, dur: Math.min(12000, Math.max(4000, total / 12)) };
+      }).filter(Boolean);
+      if (!items.length) return;
+      const t0 = performance.now();
+      const panel = document.getElementById('panel-map');
+      const frame = now => {
+        if (token !== routeAnimToken) return;      // 路線已重畫或關閉，這一輪停止
+        if (panel.classList.contains('active')) {
+          items.forEach(it => {
+            const p = ((now - t0) % (it.dur + 700)) / it.dur;     // 跑完停 0.7 秒再重來
+            const f = Math.min(p, 1) * it.total;
+            let j = 0;
+            while (j < it.cum.length - 2 && it.cum[j + 1] < f) j++;
+            const segLen = it.cum[j + 1] - it.cum[j];
+            const r = segLen > 0 ? (f - it.cum[j]) / segLen : 0;
+            const a = it.pts[j], b = it.pts[j + 1];
+            it.dot.setLatLng([a.lat + (b.lat - a.lat) * r, a.lng + (b.lng - a.lng) * r]);
+          });
+        }
+        requestAnimationFrame(frame);
+      };
+      requestAnimationFrame(frame);
+    }
+
     // 依時間順序連線（每一天一條線、顏色不同，線上用箭頭標示前進方向）
     function drawRoute() {
       if (!routeLayer) return;
+      routeAnimToken++;
       routeLayer.clearLayers();
+      const routes = [];
       const legendEl = document.getElementById('mapRouteLegend');
       document.getElementById('mapLineBtn').classList.toggle('active', mapLine);
       if (!mapLine) { legendEl.innerHTML = ''; return; }
@@ -1947,6 +1983,7 @@
         const pts = list.map(x => x.m.getLatLng());
         legend.push(`<span><i style="background:${color};"></i>${day.slice(5) || day}（${list.length}）</span>`);
         if (pts.length < 2) return;
+        routes.push({ pts: pts, color: color });
         L.polyline(pts, { color: color, weight: 3, opacity: 0.9, dashArray: '8 8', lineCap: 'round', className: 'route-flow', pane: 'routePane', interactive: false }).addTo(routeLayer);
         for (let j = 0; j < pts.length - 1; j++) {
           const a = pts[j], b = pts[j + 1];
@@ -1957,6 +1994,7 @@
         }
       });
       legendEl.innerHTML = days.length ? '<span class="lg-note">連線（依時間，每日一條）：</span>' + legend.join('') : '';
+      startRouteDots(routes);
     }
     window.toggleMapLine = function() { mapLine = !mapLine; drawRoute(); };
 
@@ -2049,6 +2087,7 @@
         L.control.layers({ '電子地圖': emap, '正射影像（衛星）': photo }, null, { position: 'topright' }).addTo(bigMap);
         L.control.scale({ imperial: false }).addTo(bigMap);
         bigMap.createPane('routePane').style.zIndex = 390;   // 連線畫在點的下面
+        const dotPane = bigMap.createPane('dotPane'); dotPane.style.zIndex = 650; dotPane.style.pointerEvents = 'none';   // 移動小圓點在地標上面
         routeLayer = L.layerGroup().addTo(bigMap);
         markerLayer = L.layerGroup();
         markerLayer.addTo(bigMap);
