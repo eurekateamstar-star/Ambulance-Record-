@@ -12,6 +12,8 @@
     <!-- 傷患地圖（Leaflet + OpenStreetMap） -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.js"></script>
     <!-- 引入 LINE LIFF SDK -->
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     
@@ -262,6 +264,21 @@
       /* 案件清單檢視模式 */
       .view-mode-bar { display: flex; gap: 6px; padding: 0 0 6px 0; }
       .view-mode-bar button { flex: 1; border: 1px solid #bae6fd; background: #fff; color: #0369a1; border-radius: 6px; padding: 6px 0; font-size: 12px; font-weight: bold; cursor: pointer; }
+      .view-mode-bar.wrap { flex-wrap: wrap; }
+      .view-mode-bar.wrap button { flex: 1 0 28%; }
+      .yr-title { font-size: 11px; color: #64748b; margin: 10px 0 4px 0; font-weight: bold; }
+      .yr-row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #334155; margin-bottom: 4px; }
+      .yr-row > span { width: 38px; }
+      .yr-row > b { width: 32px; text-align: right; }
+      .yr-bar { flex: 1; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
+      .yr-bar i { display: block; height: 100%; background: #0ea5e9; border-radius: 4px; }
+      .map-scope-opts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; font-size: 12px; color: #475569; }
+      .map-scope-opts select, .map-scope-opts input[type=date] { flex: 1; min-width: 110px; padding: 6px 8px; border: 1px solid #bae6fd; border-radius: 6px; font-size: 13px; background: #fff; color: #0f172a; }
+      .map-scope-opts button { border: 1px solid #bae6fd; background: #fff; color: #0369a1; border-radius: 6px; padding: 5px 9px; font-size: 11px; font-weight: bold; cursor: pointer; }
+      .map-legend .lg-item { cursor: pointer; user-select: none; padding: 2px 4px; border-radius: 4px; }
+      .map-legend .lg-item.off { opacity: 0.35; text-decoration: line-through; }
+      .map-legend .lg-note { color: #94a3b8; }
+      .mc-icon div { width: 34px; height: 34px; border-radius: 50%; background: rgba(2,132,199,0.88); color: #fff; font-weight: bold; font-size: 13px; display: flex; align-items: center; justify-content: center; border: 3px solid rgba(255,255,255,0.85); box-shadow: 0 2px 6px rgba(0,0,0,0.3); box-sizing: border-box; }
       .view-mode-bar button.active { background: #0284c7; color: #fff; border-color: #0284c7; }
       .view-grid { display: grid; gap: 8px; align-content: start; grid-auto-rows: max-content; }
       .view-small { grid-template-columns: repeat(3, 1fr); }
@@ -889,9 +906,11 @@
 
       <!-- 分頁 2: 數據分析儀表板 -->
       <div class="console-panel" id="panel-stats">
+        <div class="view-mode-bar wrap" id="statsYearBar"></div>
         <div class="stats-card">
           <div class="stats-card-title">📌 出勤總覽</div>
           <div id="statsTotalSummary" style="font-size:14px; color:#1e293b; font-weight:bold;">計算中...</div>
+          <div id="statsYearCompare"></div>
         </div>
         <div class="stats-card">
           <div class="stats-card-title">📊 核心問題分類與細項分析 (點擊可展開)</div>
@@ -902,9 +921,12 @@
       <!-- 分頁 3: 傷患總地圖 -->
       <div class="console-panel" id="panel-map">
         <div class="view-mode-bar" id="mapScopeBar" style="padding-bottom:0;">
-          <button type="button" data-scope="all" class="active" onclick="window.setMapScope('all')">全部日期</button>
-          <button type="button" data-scope="day" onclick="window.setMapScope('day')">僅目前日期</button>
+          <button type="button" data-scope="all" class="active" onclick="window.setMapScope('all')">全部</button>
+          <button type="button" data-scope="day" onclick="window.setMapScope('day')">單日</button>
+          <button type="button" data-scope="year" onclick="window.setMapScope('year')">整年</button>
+          <button type="button" data-scope="range" onclick="window.setMapScope('range')">自訂日期</button>
         </div>
+        <div id="mapScopeOpts" class="map-scope-opts" style="display:none;"></div>
         <div id="mapStatus" style="font-size:11px; padding:4px 8px; margin-top:6px; background:#e0f2fe; color:#0369a1; font-weight:bold;">尚未載入</div>
         <div id="bigMap"></div>
         <div id="mapLegend" class="map-legend"></div>
@@ -1832,10 +1854,25 @@
     };
 
     const CAT_COLORS = { '起水泡問題': '#0ea5e9', '抽筋/痠痛': '#8b5cf6', '跌倒/擦摔': '#f59e0b', '冷熱急症': '#ef4444', '車禍': '#111827', '肢體無力/暈眩': '#10b981', '創傷/割燙傷': '#ec4899', '其他': '#64748b' };
-    let bigMap = null, markerLayer = null, mapScope = 'all', geoRunId = 0;
-    const GEO_KEY = 'geoCacheV2';
-    function loadGeoCache() { try { return JSON.parse(localStorage.getItem(GEO_KEY) || '{}'); } catch (e) { return {}; } }
+    let bigMap = null, markerLayer = null, mapScope = 'all', geoRunId = 0, mapKey = '';
+    let mapDay = '', mapYear = '', mapFrom = '', mapTo = '';
+    let mapMarkers = [];              // 目前地圖上的標記 { m: 標記, cat: 類別 }
+    const hiddenCats = new Set();     // 圖例點掉（隱藏）的類別
+    const GEO_KEY = 'geoCacheV3';
+    function loadGeoCache() {
+      try {
+        const c = JSON.parse(localStorage.getItem(GEO_KEY) || 'null');
+        if (c) return c;
+        // 從舊版快取搬移「成功」的結果，失敗的重新嘗試（地址比對規則已加強）
+        const old = JSON.parse(localStorage.getItem('geoCacheV2') || '{}');
+        const n = {};
+        Object.keys(old).forEach(k => { if (old[k]) n[k] = old[k]; });
+        return n;
+      } catch (e) { return {}; }
+    }
     function saveGeoCache(c) { try { localStorage.setItem(GEO_KEY, JSON.stringify(c)); } catch (e) {} }
+
+    const fmtYmd = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 
     window.setMapScope = function(scope) {
       mapScope = scope;
@@ -1843,20 +1880,116 @@
       renderBigMap();
     };
 
+    // 設定日期 / 年度 / 自訂範圍
+    window.setMapOpt = function(key, val) {
+      if (key === 'day') mapDay = val;
+      else if (key === 'year') mapYear = val;
+      else if (key === 'from') mapFrom = val;
+      else if (key === 'to') mapTo = val;
+      renderBigMap();
+    };
+
+    // 快速選「近 N 日」（以資料中最新的日期為終點）
+    window.setMapRecent = function(n) {
+      if (!availableDates.length) return;
+      const latest = availableDates[availableDates.length - 1];
+      const d = new Date(latest + 'T00:00:00');
+      d.setDate(d.getDate() - (n - 1));
+      mapFrom = fmtYmd(d);
+      mapTo = latest;
+      renderBigMap();
+    };
+
+    // 圖例點擊：顯示 / 隱藏該類別
+    window.toggleMapCat = function(cat) {
+      if (hiddenCats.has(cat)) hiddenCats.delete(cat); else hiddenCats.add(cat);
+      document.querySelectorAll('#mapLegend .lg-item').forEach(el => el.classList.toggle('off', hiddenCats.has(el.dataset.cat)));
+      applyCatFilter(true);
+    };
+
+    function applyCatFilter(doFit) {
+      if (!markerLayer) return;
+      markerLayer.clearLayers();
+      const visible = mapMarkers.filter(x => !hiddenCats.has(x.cat)).map(x => x.m);
+      if (markerLayer.addLayers) markerLayer.addLayers(visible); else visible.forEach(m => markerLayer.addLayer(m));
+      if (doFit && visible.length) bigMap.fitBounds(L.latLngBounds(visible.map(m => m.getLatLng())), { padding: [30, 30], maxZoom: 16 });
+    }
+
+    // 依目前選擇的範圍，產生選單（日期 / 年度 / 自訂區間）
+    function syncMapScopeUI() {
+      const box = document.getElementById('mapScopeOpts');
+      const dates = availableDates.slice().reverse();
+      const years = Array.from(new Set(availableDates.map(x => x.slice(0, 4)))).sort().reverse();
+      if (!mapDay || availableDates.indexOf(mapDay) < 0) {
+        mapDay = (currentDateIndex >= 0 && currentDateIndex < availableDates.length) ? availableDates[currentDateIndex] : (dates[0] || '');
+      }
+      if (!mapYear || years.indexOf(mapYear) < 0) mapYear = years[0] || '';
+      if (!mapFrom && !mapTo && availableDates.length) {
+        const latest = availableDates[availableDates.length - 1];
+        const d = new Date(latest + 'T00:00:00'); d.setDate(d.getDate() - 6);
+        mapFrom = fmtYmd(d); mapTo = latest;
+      }
+      let html = '';
+      if (mapScope === 'day') {
+        html = `<select onchange="window.setMapOpt('day', this.value)">` +
+          dates.map(x => `<option value="${x}" ${x === mapDay ? 'selected' : ''}>${x}</option>`).join('') + `</select>`;
+      } else if (mapScope === 'year') {
+        html = `<select onchange="window.setMapOpt('year', this.value)">` +
+          years.map(y => `<option value="${y}" ${y === mapYear ? 'selected' : ''}>${y} 年</option>`).join('') + `</select>`;
+      } else if (mapScope === 'range') {
+        const mn = availableDates[0] || '', mx = availableDates[availableDates.length - 1] || '';
+        html = `<input type="date" value="${mapFrom}" min="${mn}" max="${mx}" onchange="window.setMapOpt('from', this.value)">
+          <span>～</span>
+          <input type="date" value="${mapTo}" min="${mn}" max="${mx}" onchange="window.setMapOpt('to', this.value)">
+          <button type="button" onclick="window.setMapRecent(3)">近3日</button>
+          <button type="button" onclick="window.setMapRecent(7)">近7日</button>
+          <button type="button" onclick="window.setMapRecent(30)">近30日</button>`;
+      }
+      box.innerHTML = html;
+      box.style.display = html ? 'flex' : 'none';
+    }
+
+    // 目前範圍內的案件
+    function mapScopeRecords() {
+      if (mapScope === 'day') return allRecordsData.filter(d => d.caseTimeNormalized === mapDay);
+      if (mapScope === 'year') return allRecordsData.filter(d => (d.caseTimeNormalized || '').slice(0, 4) === mapYear);
+      if (mapScope === 'range') {
+        let a = mapFrom, b = mapTo;
+        if (a && b && a > b) { const t = a; a = b; b = t; }
+        return allRecordsData.filter(d => d.caseTimeNormalized && (!a || d.caseTimeNormalized >= a) && (!b || d.caseTimeNormalized <= b));
+      }
+      return allRecordsData;
+    }
+
+    function mapScopeLabel() {
+      if (mapScope === 'day') return mapDay;
+      if (mapScope === 'year') return mapYear + ' 年';
+      if (mapScope === 'range') return (mapFrom || '…') + ' ～ ' + (mapTo || '…');
+      return '全部日期';
+    }
+
     const sleep = ms => new Promise(r => setTimeout(r, ms));
     async function geocodeAddress(addr) {
       const base = String(addr).replace(/^\d{3,6}\s*/, '').replace(/\s+/g, '').replace(/台(中|北|南|東)/g, '臺$1');
       const noSuffix = base.replace(/(門口|附近|旁邊|旁|對面|前方|前面|前|路口|入口)$/, '');
+      const noLi = noSuffix.replace(/([區鄉鎮市])[^區鄉鎮市路街道巷弄段\d]{1,4}[里村]/, '$1');
       const roadOnly = base.replace(/\d+(之\d+)?號.*$/, '');
-      const variants = Array.from(new Set([base, noSuffix, roadOnly])).filter(v => v.length >= 2);
-      for (const q of variants) {
-        const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=tw&accept-language=zh-TW&viewbox=120.0,24.9,121.0,23.4&bounded=1&q=${encodeURIComponent(q)}`;
+      const variants = Array.from(new Set([base, noSuffix, noLi, roadOnly])).filter(v => v.length >= 2);
+      const bounded = '&viewbox=120.0,24.9,121.0,23.4&bounded=1';
+      const tryQuery = async (q, extra) => {
+        const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=tw&accept-language=zh-TW${extra}&q=${encodeURIComponent(q)}`;
         const res = await fetch(url);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
         const j = await res.json();
         await sleep(1100);
-        if (j[0]) return [parseFloat(j[0].lat), parseFloat(j[0].lon)];
+        return j[0] ? [parseFloat(j[0].lat), parseFloat(j[0].lon)] : null;
+      };
+      for (const q of variants) {
+        const pt = await tryQuery(q, bounded);
+        if (pt) return pt;
       }
-      return null;
+      // 最後一次：不限範圍再試一次（路線外的地址）
+      return await tryQuery(noSuffix || base, '');
     }
 
     async function renderBigMap() {
@@ -1864,75 +1997,115 @@
       if (typeof L === 'undefined') { statusEl.innerText = '地圖元件載入失敗，請檢查網路後重新開啟'; return; }
 
       if (!bigMap) {
-        bigMap = L.map('bigMap').setView([24.4, 120.6], 10);
+        bigMap = L.map('bigMap', { zoomControl: true }).setView([24.4, 120.6], 10);
         const emap = L.tileLayer('https://wmts.nlsc.gov.tw/wmts/EMAP/default/GoogleMapsCompatible/{z}/{y}/{x}', { maxZoom: 19, maxNativeZoom: 18, attribution: '© 內政部國土測繪中心' });
         const photo = L.tileLayer('https://wmts.nlsc.gov.tw/wmts/PHOTO2/default/GoogleMapsCompatible/{z}/{y}/{x}', { maxZoom: 19, maxNativeZoom: 19, attribution: '© 內政部國土測繪中心' });
         emap.addTo(bigMap);
         L.control.layers({ '電子地圖': emap, '正射影像（衛星）': photo }, null, { position: 'topright' }).addTo(bigMap);
         L.control.scale({ imperial: false }).addTo(bigMap);
-        markerLayer = L.layerGroup().addTo(bigMap);
-        document.getElementById('mapLegend').innerHTML = Object.entries(CAT_COLORS).map(([k, c]) => `<span><i style="background:${c};"></i>${k}</span>`).join('') + '<span>（空心 = 依地址估算位置）</span>';
+        // 標記太多時自動聚合成數字圓圈（放大後展開）
+        markerLayer = (L.markerClusterGroup)
+          ? L.markerClusterGroup({
+              showCoverageOnHover: false, maxClusterRadius: 38, spiderfyOnMaxZoom: true, disableClusteringAtZoom: 17,
+              iconCreateFunction: c => L.divIcon({ html: `<div>${c.getChildCount()}</div>`, className: 'mc-icon', iconSize: [34, 34] })
+            })
+          : L.layerGroup();
+        markerLayer.addTo(bigMap);
       }
+      syncMapScopeUI();
       setTimeout(() => bigMap.invalidateSize(), 60);
-      markerLayer.clearLayers();
+
+      const records = mapScopeRecords();
+      const key = [mapScope, mapDay, mapYear, mapFrom, mapTo, records.length, records[0] && records[0].id, records[records.length - 1] && records[records.length - 1].id].join('|');
+      if (key === mapKey) return;      // 範圍沒變：保留現有地圖，不重畫
+      mapKey = key;
 
       const runId = ++geoRunId;
-      const activeDate = (currentDateIndex >= 0 && currentDateIndex < availableDates.length) ? availableDates[currentDateIndex] : '';
-      const records = allRecordsData.filter(d => mapScope === 'all' || !activeDate || d.caseTimeNormalized === activeDate);
+      markerLayer.clearLayers();
+      mapMarkers = [];
 
-      const points = [];
-      let shown = 0, noGeo = 0, fail = 0;
       const locOf = d => (typeof d.location === 'string') ? { address: d.location } : (d.location || {});
+      const catOf = d => normalizeCategory(d.scene ? d.scene.problems : '');
 
+      // 圖例（可點擊篩選類別，並顯示該範圍內的件數）
+      const catCount = {};
+      records.forEach(d => { const c = catOf(d); catCount[c] = (catCount[c] || 0) + 1; });
+      document.getElementById('mapLegend').innerHTML = Object.entries(CAT_COLORS).map(([k, c]) =>
+        `<span class="lg-item ${hiddenCats.has(k) ? 'off' : ''}" data-cat="${k}" onclick="window.toggleMapCat('${k}')"><i style="background:${c};"></i>${k}${catCount[k] ? ' ' + catCount[k] : ''}</span>`
+      ).join('') + '<span class="lg-note">（空心 = 依地址估算位置；點類別可隱藏）</span>';
+
+      let shown = 0, noGeo = 0, fail = 0;
       const addMarker = (d, lat, lng, approx) => {
         const l = locOf(d);
         const pName = d.patient ? d.patient.name : '不詳';
         const armband = (d.patient && d.patient.armband && d.patient.armband !== '無') ? `(臂章:${d.patient.armband})` : '';
         const problem = d.scene ? d.scene.problems : '';
-        const color = CAT_COLORS[normalizeCategory(problem)] || '#64748b';
+        const cat = catOf(d);
+        const color = CAT_COLORS[cat] || '#64748b';
         const m = L.circleMarker([lat, lng], { radius: 8, color: color, weight: 2, fillColor: color, fillOpacity: approx ? 0.15 : 0.75 });
         m.bindPopup(`<b>${pName}</b> ${armband}<br><span style="color:#D65A68; font-weight:bold;">${problem}</span><br>🕒 ${d.caseTimeNormalized || ''} ${d.caseTimeHM || ''}<br>📍 ${l.address || '(定位座標)'}${approx ? '<br><span style="color:#94a3b8;">依地址估算位置</span>' : ''}<br><a href="#" onclick="window.openDetailById('${d.id}'); return false;" style="color:#0284c7; font-weight:bold;">檢視紀錄 ›</a>`);
-        m.addTo(markerLayer);
-        points.push([lat, lng]);
+        mapMarkers.push({ m: m, cat: cat });
+        if (!hiddenCats.has(cat)) markerLayer.addLayer(m);
         shown++;
       };
 
-      const pending = [];
+      // 有座標的先畫；只有地址的依「地址」去重，同一地址只查一次
+      const byAddr = new Map();
+      let pendingCount = 0;
       records.forEach(d => {
         const l = locOf(d);
         const lat = parseFloat(l.lat), lng = parseFloat(l.lng);
         if (isFinite(lat) && isFinite(lng)) addMarker(d, lat, lng, false);
-        else if (l.address && String(l.address).trim()) pending.push(d);
-        else noGeo++;
+        else if (l.address && String(l.address).trim()) {
+          const a = String(l.address).trim();
+          if (!byAddr.has(a)) byAddr.set(a, []);
+          byAddr.get(a).push(d);
+          pendingCount++;
+        } else noGeo++;
       });
 
+      const label = mapScopeLabel();
       const refreshStatus = (done) => {
-        statusEl.innerText = `📍 已標示 ${shown} 筆` + (pending.length ? `｜地址轉換 ${done}/${pending.length}` : '') + ((fail + noGeo) ? `｜無法定位 ${fail + noGeo} 筆` : '') + `（共 ${records.length} 件）`;
+        statusEl.innerText = `📍 ${label}｜已標示 ${shown} 筆` + (pendingCount && done < pendingCount ? `｜地址轉換 ${done}/${pendingCount}` : '') + ((fail + noGeo) ? `｜無法定位 ${fail + noGeo} 筆` : '') + `（共 ${records.length} 件）`;
       };
-      const fit = () => { if (points.length > 0) bigMap.fitBounds(points, { padding: [30, 30], maxZoom: 16 }); };
+      const fit = () => {
+        const pts = mapMarkers.filter(x => !hiddenCats.has(x.cat)).map(x => x.m.getLatLng());
+        if (pts.length > 0) bigMap.fitBounds(L.latLngBounds(pts), { padding: [30, 30], maxZoom: 16 });
+      };
       refreshStatus(0);
       fit();
 
       const cache = loadGeoCache();
-      let done = 0;
-      for (const d of pending) {
+      let done = 0, sinceFit = 0;
+      // 先處理有快取的（不用等網路），再處理要上網查的
+      const entries = Array.from(byAddr.entries());
+      const cached = entries.filter(([a]) => cache[a] !== undefined);
+      const todo = entries.filter(([a]) => cache[a] === undefined);
+      for (const [addr, list] of cached) {
+        const pt = cache[addr];
+        list.forEach(d => { if (pt) addMarker(d, pt[0], pt[1], true); else fail++; });
+        done += list.length;
+      }
+      refreshStatus(done);
+      fit();
+
+      for (const [addr, list] of todo) {
         if (runId !== geoRunId) return;
-        const addr = String(locOf(d).address).trim();
-        let pt = cache[addr];
-        if (pt === undefined) {
-          try {
-            pt = await geocodeAddress(addr);
-            cache[addr] = pt;
-            saveGeoCache(cache);
-          } catch (e) { pt = null; await sleep(1100); }
-        }
+        let pt;
+        try {
+          pt = await geocodeAddress(addr);
+          cache[addr] = pt;
+          saveGeoCache(cache);
+        } catch (e) { pt = null; await sleep(1100); }
         if (runId !== geoRunId) return;
-        if (pt) addMarker(d, pt[0], pt[1], true); else fail++;
-        done++;
+        list.forEach(d => { if (pt) addMarker(d, pt[0], pt[1], true); else fail++; });
+        done += list.length;
+        sinceFit += list.length;
         refreshStatus(done);
-        if (done % 5 === 0) fit();
+        if (sinceFit >= 5) { fit(); sinceFit = 0; }
       }
       fit();
+      refreshStatus(done);
     }
 
     window.openAdminConsole = async function() {
@@ -2100,13 +2273,32 @@
       listContainer.innerHTML = html;
     }
 
+    let statsYear = null;   // null = 尚未選擇（預設最新年度）；'all' = 全部年度
+    const recYear = r => (r.caseTimeNormalized || '').slice(0, 4);
+    window.setStatsYear = function(y) { statsYear = y; renderStatsCharts(); };
+
     function renderStatsCharts() {
-      const total = allRecordsData.length;
-      document.getElementById('statsTotalSummary').innerHTML = `總計資料庫累積救護案件：<b style="color:#0284c7; font-size:18px;">${total}</b> 件`;
+      // ★ 年度選擇：預設顯示最新一年，可切換「全部年度」或其他年份
+      const years = Array.from(new Set(allRecordsData.map(recYear).filter(Boolean))).sort().reverse();
+      if (statsYear === null || (statsYear !== 'all' && years.indexOf(statsYear) === -1)) statsYear = years[0] || 'all';
+      const yearCount = {};
+      allRecordsData.forEach(r => { const y = recYear(r); if (y) yearCount[y] = (yearCount[y] || 0) + 1; });
+      const maxYc = Math.max(1, ...Object.values(yearCount));
+
+      document.getElementById('statsYearBar').innerHTML = ['all'].concat(years).map(y =>
+        `<button type="button" class="${y === statsYear ? 'active' : ''}" onclick="window.setStatsYear('${y}')">${y === 'all' ? '全部年度' : y + ' 年'}</button>`).join('');
+      document.getElementById('statsYearCompare').innerHTML = years.length > 1
+        ? '<div class="yr-title">各年度案件數</div>' + years.map(y =>
+            `<div class="yr-row"><span>${y}</span><div class="yr-bar"><i style="width:${Math.round(yearCount[y] / maxYc * 100)}%"></i></div><b>${yearCount[y]}</b></div>`).join('')
+        : '';
+
+      const records = statsYear === 'all' ? allRecordsData : allRecordsData.filter(r => recYear(r) === statsYear);
+      const total = records.length;
+      document.getElementById('statsTotalSummary').innerHTML = `${statsYear === 'all' ? '歷年累積' : statsYear + ' 年'}救護案件：<b style="color:#0284c7; font-size:18px;">${total}</b> 件`;
 
       let categoryMap = {}; 
 
-      allRecordsData.forEach(r => {
+      records.forEach(r => {
         const pStr = r.scene && r.scene.problems ? r.scene.problems : "其他";
         const seenCats = new Set();
 
