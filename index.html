@@ -276,6 +276,9 @@
       .map-legend .lg-item { cursor: pointer; user-select: none; padding: 2px 4px; border-radius: 4px; }
       .map-legend .lg-item.off { opacity: 0.35; text-decoration: line-through; }
       .map-legend .lg-note { color: #94a3b8; }
+      @keyframes routeFlow { to { stroke-dashoffset: -16; } }
+      .route-flow { animation: routeFlow 0.7s linear infinite; }
+      @media (prefers-reduced-motion: reduce) { .route-flow { animation: none; } }
       .map-pin svg { display: block; filter: drop-shadow(0 1px 1.5px rgba(0,0,0,0.45)); }
       .map-pin.approx svg { opacity: 0.55; }
       .map-tools { margin-top: 6px; display: flex; gap: 6px; }
@@ -1944,7 +1947,7 @@
         const pts = list.map(x => x.m.getLatLng());
         legend.push(`<span><i style="background:${color};"></i>${day.slice(5) || day}（${list.length}）</span>`);
         if (pts.length < 2) return;
-        L.polyline(pts, { color: color, weight: 2.5, opacity: 0.85, dashArray: '6 4', pane: 'routePane', interactive: false }).addTo(routeLayer);
+        L.polyline(pts, { color: color, weight: 3, opacity: 0.9, dashArray: '8 8', lineCap: 'round', className: 'route-flow', pane: 'routePane', interactive: false }).addTo(routeLayer);
         for (let j = 0; j < pts.length - 1; j++) {
           const a = pts[j], b = pts[j + 1];
           if (a.distanceTo(b) < 300) continue;     // 太近的兩點不畫箭頭，避免擠在一起
