@@ -276,6 +276,10 @@
       .map-legend .lg-item { cursor: pointer; user-select: none; padding: 2px 4px; border-radius: 4px; }
       .map-legend .lg-item.off { opacity: 0.35; text-decoration: line-through; }
       .map-legend .lg-note { color: #94a3b8; }
+      .gps-addr-line { margin: 0 14px 10px 14px; padding: 9px 12px; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 10px; }
+      .gps-addr-line .ga-title { font-size: 11px; font-weight: bold; color: #0369a1; margin-bottom: 3px; }
+      .gps-addr-line .ga-text { font-size: 14px; color: #0f172a; word-break: break-all; line-height: 1.5; }
+      .gps-addr-line .ga-hint { font-size: 11px; color: #94a3b8; margin-top: 4px; }
       @keyframes routeFlow { to { stroke-dashoffset: -16; } }
       .route-flow { animation: routeFlow 0.7s linear infinite; }
       @media (prefers-reduced-motion: reduce) { .route-flow { animation: none; } }
@@ -526,13 +530,15 @@
             </div>
             <div class="row" style="padding-right:10px;">
               <div class="label">地點</div>
-              <input type="text" name="location" placeholder="發生地址 (或地標)">
+              <input type="text" name="location" placeholder="地址或地標（可留空）">
               <button type="button" class="gps-btn" id="gpsBtn" onclick="window.getGPS()">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>定位
               </button>
             </div>
             <input type="hidden" name="gps_lat" id="gps_lat">
             <input type="hidden" name="gps_lng" id="gps_lng">
+            <input type="hidden" name="gps_address" id="gps_address">
+            <div id="gpsAddrLine" style="display:none;"></div>
             <div id="gpsMapPreview" style="display:none; padding:0 14px 14px 14px;"></div>
           </div>
 
@@ -1237,6 +1243,7 @@
     }
 
     function updateGpsMap() {
+      updateGpsAddrLine();
       const box = document.getElementById('gpsMapPreview');
       const lat = document.getElementById('gps_lat').value;
       const lng = document.getElementById('gps_lng').value;
@@ -1253,25 +1260,42 @@
     }
 
     let lastAutoAddress = '';
+    let gpsAddrBusy = false;
+    const coordText = (lat, lng) => 'GPS ' + Number(lat).toFixed(5) + ', ' + Number(lng).toFixed(5);
+    // 最後要記錄的地點：使用者有填就用填的，沒填就用定位轉換的地址（或 GPS 座標）
+    function effLoc(fd) {
+      return String(fd.get('location') || '').trim() || String(fd.get('gps_address') || '').trim();
+    }
+
+    // 地點欄下方顯示「定位地址」（轉換的地址，或離線時的 GPS 座標）
+    function updateGpsAddrLine() {
+      const box = document.getElementById('gpsAddrLine');
+      const lat = document.getElementById('gps_lat').value;
+      const lng = document.getElementById('gps_lng').value;
+      if (!(lat && lng)) { box.style.display = 'none'; box.innerHTML = ''; return; }
+      const addr = document.getElementById('gps_address').value || coordText(lat, lng);
+      box.innerHTML = `<div class="gps-addr-line">
+        <div class="ga-title">📍 定位地址${gpsAddrBusy ? '（轉換中…）' : ''}</div>
+        <div class="ga-text">${esc(addr)}</div>
+        <div class="ga-hint">上方「地點」有填寫就記錄你填的；留空則記錄這個定位地址</div>
+      </div>`;
+      box.style.display = 'block';
+    }
+
+    function setGpsAddress(text, busy) {
+      document.getElementById('gps_address').value = text || '';
+      gpsAddrBusy = !!busy;
+      updateGpsAddrLine();
+    }
+
     async function fillAddressFromGPS(lat, lng) {
-      const input = document.querySelector('input[name="location"]');
-      const cur = input.value.trim();
-      if (cur && cur !== lastAutoAddress) return; 
+      const coords = coordText(lat, lng);
+      setGpsAddress(coords, false);                                    // 先記座標，轉換失敗 / 沒網路也有東西可記錄
+      if (navigator.onLine === false) return;                          // 沒網路：直接用座標
 
-      // 沒網路或轉換失敗：先填入 GPS 座標，欄位才不會是空的（連線後再按一次「定位」可轉成地址）
-      const useCoords = (msg) => {
-        const txt = 'GPS ' + Number(lat).toFixed(5) + ', ' + Number(lng).toFixed(5);
-        input.value = txt;
-        lastAutoAddress = txt;
-        const row = input.closest('.row');
-        if (row) row.classList.remove('field-error');
-        window.showNotice('info', msg, '已記錄 GPS 座標並先填入地點欄，可自行改成地址或地標；連線後再按一次「定位」可自動轉成地址。');
-      };
-      if (navigator.onLine === false) { useCoords('目前無網路'); return; }
-
-      input.placeholder = '地址轉換中...';
+      setGpsAddress(coords, true);
       const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), 6000);   // 網路太慢就放棄，不要卡住
+      const timer = setTimeout(() => ctrl.abort(), 6000);              // 網路太慢就放棄，不卡住
       try {
         const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=zh-TW`;
         const res = await fetch(url, { signal: ctrl.signal });
@@ -1282,16 +1306,11 @@
         const parts = raw.filter((v, i) => v && v !== raw[i - 1]);
         let addr = parts.join('');
         if (!addr && j.display_name) addr = j.display_name.split(',').map(x => x.trim()).reverse().join('');
-        if (!addr) throw new Error('no address');
-        input.value = addr;
-        lastAutoAddress = addr;
-        const row = input.closest('.row');
-        if (row) row.classList.remove('field-error');
+        setGpsAddress(addr || coords, false);
       } catch (e) {
-        useCoords('無法自動取得地址');
+        setGpsAddress(coords, false);
       } finally {
         clearTimeout(timer);
-        input.placeholder = '發生地址 (或地標)';
       }
     }
 
@@ -1740,7 +1759,7 @@
       const boxOf = name => { const i = form.elements[name]; return i ? i.closest('.col-box, .row, .card') : null; };
 
       if (!filled(fd.get('personnel'))) add(0, '人員', boxOf('personnel'));
-      if (!filled(fd.get('location'))) add(0, '地點', boxOf('location'));
+      if (!effLoc(fd)) add(0, '地點（請填寫，或按「定位」）', boxOf('location'));
       // ★ 新增紀錄一定要按過「定位」取得 GPS 才能下一步（編輯舊紀錄不強制，避免舊資料無法儲存）
       if (!editingId && !(filled(fd.get('gps_lat')) && filled(fd.get('gps_lng')))) add(0, '定位（請按地點旁的「定位」按鈕）', boxOf('location'));
       if (!filled(fd.get('pName'))) add(0, '患者姓名', boxOf('pName'));
@@ -1824,7 +1843,7 @@
           <div class="report-item"><span>姓名 / 性別</span><b>${fd.get('pName') || '不詳'} (${fd.get('gender')})</b></div>
           <div class="report-item"><span>年齡 / 電話</span><b>${fd.get('age') ? fd.get('age') + '歲' : '無'} / ${fd.get('pPhone') || '無'}</b></div>
           <div class="report-item"><span>臂章編號</span><b>${fd.get('armband') || '無'}</b></div>
-          <div class="report-item"><span>地點</span><b>${fd.get('location') || '未填'}</b></div>
+          <div class="report-item"><span>地點</span><b>${effLoc(fd) || '未填'}</b></div>
         </div>
 
         <div class="report-section-title">2. 現場狀況與主訴</div>
@@ -1853,7 +1872,7 @@
         <div class="preview-photos-grid">
           ${photosHtml}
         </div>
-        ${(fd.get('gps_lat') || fd.get('location')) ? `<div class="report-section-title">5. 發生地點地圖</div>${mapEmbedHtml(fd.get('gps_lat'), fd.get('gps_lng'), fd.get('location'), 150)}` : ''}
+        ${(fd.get('gps_lat') || effLoc(fd)) ? `<div class="report-section-title">5. 發生地點地圖</div>${mapEmbedHtml(fd.get('gps_lat'), fd.get('gps_lng'), effLoc(fd), 150)}` : ''}
         <div style="text-align:center; font-size:10px; color:#888; margin-top:8px;">💡 提示：您可以直接「長按上方表格」將整張紀錄表儲存為圖片</div>
       `;
 
@@ -2653,7 +2672,7 @@
 
       setv('personnel', d.personnel === '未填' ? '' : d.personnel);
       setv('location', typeof d.location === 'string' ? d.location : L.address);
-      setv('gps_lat', L.lat); setv('gps_lng', L.lng);
+      setv('gps_lat', L.lat); setv('gps_lng', L.lng); setv('gps_address', '');
       if(L.lat && L.lng) {
         const gpsBtn = document.getElementById('gpsBtn');
         gpsBtn.innerHTML = "✅ 已定位"; gpsBtn.classList.add('success');
@@ -2778,7 +2797,7 @@
         caseTime: fd.get('caseTime'),
         personnel: fd.get('personnel') || '未填',
         location: {
-          address: fd.get('location') || '',
+          address: effLoc(fd),
           lat: fd.get('gps_lat') || null,
           lng: fd.get('gps_lng') || null
         },
