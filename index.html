@@ -443,6 +443,7 @@
       .u-cat-tag { font-size: 10px; font-weight: 700; color: #7c3aed; background: #f3e8ff; padding: 2px 6px; border-radius: 4px; margin-left: 4px; vertical-align: middle; white-space: nowrap; }
       .u-wh-tag { font-size: 10px; font-weight: 700; color: #b91c1c; background: #fee2e2; padding: 2px 6px; border-radius: 4px; margin-left: 4px; vertical-align: middle; white-space: nowrap; }
       .ub-cat { background: #7c3aed; }
+      .ub-kick { background: #b91c1c; }
       .ucat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 10px 0 14px; max-height: 50vh; overflow-y: auto; }
       .ucat-btn { border: 1px solid #cbd5e1; background: #f8fafc; color: #1e293b; font-size: 14px; font-weight: 700; padding: 12px 6px; border-radius: 10px; cursor: pointer; word-break: break-all; }
       .ucat-btn:active { transform: scale(0.97); }
@@ -1183,6 +1184,7 @@
             document.getElementById('authPending').style.display = 'block';
           }
         } else {
+          localStorage.removeItem('sfc_user_cache');   // ★ 被踢出（資料已刪除）：清掉離線登入快取
           document.getElementById('authScreen').style.display = 'flex';
           document.getElementById('authRegister').style.display = 'block';
         }
@@ -3124,6 +3126,7 @@
       }
       actionBtns += `<button class="u-btn ub-cat" onclick="window.openUserCategory('${u.id}')">🏷️ 分類</button>`;
       actionBtns += `<button class="u-btn ub-edit" onclick="window.openUserEdit('${u.id}')">✏️ 編輯資料</button>`;
+      if (!(currentUserProfile && u.id === currentUserProfile.userId)) actionBtns += `<button class="u-btn ub-kick" onclick="window.kickUser('${u.id}')">🗑️ 踢出</button>`;
 
       let roleBtns = '';
       if (u.status === 'approved') {
@@ -3382,6 +3385,22 @@
       } catch (e) {
         document.getElementById('loading').style.display = 'none';
         window.showNotice('error', '設定失敗', e.message);
+      }
+    };
+
+    // ★ 完全踢出：刪除人員資料，從名單消失；對方再打開要重新填資料、重新審核（倉庫也一樣）
+    window.kickUser = async function(userId) {
+      if (currentUserProfile && userId === currentUserProfile.userId) { window.showNotice('error', '無法操作', '不能踢出自己的帳號。'); return; }
+      const u = adminUsersMap[userId] || {};
+      if (!(await window.showConfirm('完全踢出？', `確定把「${u.realName || ''}」完全踢出？\n會從名單消失（白沙屯與倉庫都會），對方立刻被登出；要再加入必須重新填資料、等待審核。已填寫的救護紀錄會保留。`))) return;
+      try {
+        document.getElementById('loading').style.display = 'flex';
+        await deleteDoc(doc(db, "users", userId));
+        document.getElementById('loading').style.display = 'none';
+        window.showNotice('success', '已踢出', `「${u.realName || ''}」已從名單移除`);
+      } catch (e) {
+        document.getElementById('loading').style.display = 'none';
+        window.showNotice('error', '踢出失敗', e.message);
       }
     };
 
