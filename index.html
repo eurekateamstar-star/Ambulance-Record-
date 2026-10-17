@@ -33,7 +33,7 @@
       .header-org-name { font-size: 10px; font-weight: 600; color: #999; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 2px; }
       
       .admin-top-btn { display: none; position: absolute; top: 12px; right: 16px; background: #333; color: #ffeb3b; border: 1px solid #ffeb3b; padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: bold; cursor: pointer; z-index: 2500; }
-      .admin-console-btn { display: none; position: absolute; top: 12px; right: 115px; background: #0284c7; color: #fff; border: none; padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: bold; cursor: pointer; z-index: 2500; }
+      .admin-console-btn { display: none; position: absolute; top: 12px; right: 16px; background: #0284c7; color: #fff; border: none; padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: bold; cursor: pointer; z-index: 2500; }
 
       .tabs { display: flex; padding: 8px 15px 12px 15px; gap: 5px; pointer-events: none; }
       .tab-item { flex: 1; text-align: center; padding: 8px 0; font-size: 13px; font-weight: 600; color: #ccc; border-radius: 12px; transition: all 0.3s; }
@@ -1573,6 +1573,9 @@
       const isAdm = !!(currentUserData && currentUserData.role === 'admin');
       const onPage = steps[currentStep] === 'treatment';
       btn.style.display = (isAdm && onPage) ? 'block' : 'none';
+      // 主控台靠右；管理員調整出現時，主控台往左讓位
+      const cb = document.querySelector('.admin-console-btn');
+      if (cb) cb.style.right = (isAdm && onPage) ? (btn.offsetWidth + 24) + 'px' : '16px';
       if (!onPage && isAdminMode) window.toggleAdminMode();
     }
 
