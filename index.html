@@ -446,6 +446,10 @@
       .u-wh-tag { font-size: 10px; font-weight: 700; color: #b91c1c; background: #fee2e2; padding: 2px 6px; border-radius: 4px; margin-left: 4px; vertical-align: middle; white-space: nowrap; }
       .ub-cat { background: #7c3aed; }
       .ub-kick { background: #b91c1c; }
+      .cert-group { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 6px; }
+      .cert-btn { border: 1.5px solid #e2e8f0; background: #f8fafc; color: #334155; font-size: 14px; font-weight: 700; padding: 10px 4px; border-radius: 10px; cursor: pointer; }
+      .cert-btn:active { transform: scale(0.96); }
+      .cert-btn.on { background: var(--ssc-primary, #D65A68); border-color: var(--ssc-primary, #D65A68); color: #fff; }
       .ucat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 10px 0 14px; max-height: 50vh; overflow-y: auto; }
       .ucat-btn { border: 1px solid #cbd5e1; background: #f8fafc; color: #1e293b; font-size: 14px; font-weight: 700; padding: 12px 6px; border-radius: 10px; cursor: pointer; word-break: break-all; }
       .ucat-btn:active { transform: scale(0.97); }
@@ -490,6 +494,10 @@
       <div class="modal-row">
         <label>身分證字號</label>
         <input type="text" id="regIdCard" class="modal-input" placeholder="請輸入身分證字號" style="text-transform: uppercase;">
+      </div>
+      <div class="modal-row" style="flex-direction:column; align-items:stretch;">
+        <label>證照類別</label>
+        <div class="cert-group" id="regCertGroup"><button type="button" class="cert-btn" data-cert="EMT-1" onclick="window.pickCert('EMT-1')">EMT-1</button><button type="button" class="cert-btn" data-cert="EMT-2" onclick="window.pickCert('EMT-2')">EMT-2</button><button type="button" class="cert-btn" data-cert="EMT-P" onclick="window.pickCert('EMT-P')">EMT-P</button><button type="button" class="cert-btn" data-cert="護理師" onclick="window.pickCert('護理師')">護理師</button><button type="button" class="cert-btn" data-cert="醫師" onclick="window.pickCert('醫師')">醫師</button><button type="button" class="cert-btn" data-cert="無證照" onclick="window.pickCert('無證照')">無證照</button></div>
       </div>
       <button class="notice-btn" style="margin-top:20px;" onclick="window.submitRegistration()">送出審核</button>
     </div>
@@ -1292,11 +1300,19 @@
       isResubmit = true;
       document.getElementById('regRealName').value = (currentUserData && currentUserData.realName) || '';
       document.getElementById('regIdCard').value = (currentUserData && currentUserData.idCard) || '';
+      window.pickCert((currentUserData && (currentUserData.certification || currentUserData.category)) || '');
       document.getElementById('authRejected').style.display = 'none';
       document.getElementById('authRegister').style.display = 'block';
     };
 
     // 送出實名制與身分證註冊
+    // ★ 證照類別（註冊時必選，直接成為人員分類）
+    let regCert = '';
+    window.pickCert = function(c) {
+      regCert = ['EMT-1','EMT-2','EMT-P','護理師','醫師','無證照'].includes(c) ? c : '';
+      document.querySelectorAll('#regCertGroup .cert-btn').forEach(x => x.classList.toggle('on', x.dataset.cert === regCert));
+    };
+
     window.submitRegistration = async function() {
       const realName = document.getElementById('regRealName').value.trim();
       const idCard = document.getElementById('regIdCard').value.trim().toUpperCase();
@@ -1304,6 +1320,7 @@
 
       if (!realName) { alert("請輸入真實姓名"); return; }
       if (!idCardRegex.test(idCard)) { alert("身分證字號格式不正確"); return; }
+      if (!regCert) { alert("請選擇證照類別"); return; }
 
       document.getElementById('authRegister').style.display = 'none';
       document.getElementById('authLoading').style.display = 'block';
@@ -1318,6 +1335,9 @@
             pictureUrl: currentUserProfile.pictureUrl || '',
             realName: realName,
             idCard: idCard,
+            certification: regCert,
+            category: regCert,
+            warehouseCategory: regCert,
             status: 'pending',
             rejectReason: '',
             resubmittedAt: serverTimestamp()
@@ -1334,6 +1354,9 @@
             pictureUrl: currentUserProfile.pictureUrl || '',
             realName: realName,
             idCard: idCard,
+            certification: regCert,
+            category: regCert,
+            warehouseCategory: regCert,
             status: isFirstUser ? 'approved' : 'pending',
             role: isFirstUser ? 'admin' : 'user',
             createdAt: serverTimestamp()
