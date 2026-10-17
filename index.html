@@ -358,7 +358,9 @@
       .cc-thumb.show-loc .cc-pane-loc { display: flex; }
 
       /* 必填未填紅框 */
-      .field-error { outline: 2px solid #ef4444; outline-offset: -2px; border-radius: 14px; background-color: rgba(254, 226, 226, 0.45) !important; animation: errShake 0.3s; }
+      /* ★ 未填欄位紅框：畫在內側 3px、圓角跟著卡片走，避免被卡片圓角切掉而看起來消失 */
+      .field-error { position: relative; isolation: isolate; outline: none; animation: errShake 0.3s; }
+      .field-error::after { content: ''; position: absolute; inset: 3px; border: 2px solid #ef4444; border-radius: 17px; background: rgba(254, 226, 226, 0.55); pointer-events: none; z-index: -1; }
       .scene-grid-container.field-error { padding-top: 8px; padding-bottom: 8px; }
       @keyframes errShake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
 
