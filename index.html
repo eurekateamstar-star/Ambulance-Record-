@@ -3066,7 +3066,7 @@
         const b = document.createElement('button');
         b.type = 'button';
         b.className = 'u-chip' + (adminUserCat === key ? ' on' : '');
-        b.textContent = `${label} ${n}`;
+        b.textContent = `${label} (${n})`;
         b.onclick = () => { adminUserCat = key; renderAdminUsers(adminUsersCache || users); };
         el.appendChild(b);
       };
