@@ -105,7 +105,7 @@
       .body-map-scroll { max-width: 380px; margin: 0 auto 20px auto; }
       .body-map-scroll .body-map-container { margin: 0 auto; }
       .body-map-scroll.zoomed { max-width: 100%; overflow: auto; max-height: 68vh; border-radius: 16px; -webkit-overflow-scrolling: touch; box-shadow: inset 0 0 0 2px #00c853; }
-      .body-map-scroll.zoomed .body-map-container { width: 250%; max-width: none; }
+      .body-map-scroll.zoomed .body-map-container { max-width: none; }
       
       .z-f-face { top: 4%; left: 22%; width: 11%; height: 10%; border-radius: 50%; }
       .z-f-neck { top: 14%; left: 24%; width: 7%; height: 5%; }
@@ -186,8 +186,10 @@
       .report-item span { color: #666; font-size: 10px; display: block; }
       .report-item b { font-size: 12px; color: #222; }
 
-      .preview-body-container { position: relative; width: 100px; margin: 2px auto; background: #fff; border-radius: 6px; border: 1px solid #ddd; line-height: 0; }
+      .preview-body-container { position: relative; width: 140px; margin: 2px auto; background: #fff; border-radius: 6px; border: 1px solid #ddd; line-height: 0; }
       .preview-body-img { width: 100%; height: auto; display: block; border-radius: 6px; opacity: 0.9; }
+      .injury-overlay { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+      .injury-overlay polygon { fill: rgba(214, 90, 104, 0.45); stroke: #D65A68; stroke-width: 1.2; vector-effect: non-scaling-stroke; }
       .preview-dot { position: absolute; width: 8px; height: 8px; background: #D65A68; border: 1px solid #fff; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 4px #D65A68; }
 
       .preview-photos-grid { display: flex; gap: 6px; justify-content: center; margin-top: 4px; }
@@ -1576,6 +1578,18 @@
       }
     };
 
+
+    // ★ 傷情部位：用紅色輪廓顯示（優先用標記當下存的形狀，舊紀錄沒有就用目前的區塊形狀，都沒有才用點）
+    function injuryOverlayHtml(parts) {
+      let polys = '', dots = '';
+      (parts || []).forEach(i => {
+        const shape = i.poly || (bodyPolys[i.part] ? polyToStr(bodyPolys[i.part]) : '');
+        if (shape) polys += `<polygon points="${shape}"></polygon>`;
+        else if (i.x && i.y) dots += `<div class="preview-dot" style="top:${i.y}%; left:${i.x}%;"></div>`;
+      });
+      return (polys ? `<svg class="injury-overlay" viewBox="0 0 100 100" preserveAspectRatio="none">${polys}</svg>` : '') + dots;
+    }
+
     // 管理員調整按鈕：只有管理員、而且在「急救處置（受傷部位）」這一頁才顯示
     function updateAdminAdjustBtn() {
       const btn = document.querySelector('.admin-top-btn');
@@ -1602,7 +1616,7 @@
       if (isAdminMode) {
         container.classList.add('admin-editing');
         bar.classList.add('active');
-        window.showNotice('info', '管理員調整模式', '1. 點黃色區塊選取。\n2. 拖綠色點改變形狀。\n3. 拖邊上的小綠點，可新增頂點，讓形狀更貼合人體。\n4. 點綠圈變紅後，按「✕ 刪除點」可刪掉（至少保留 3 點）。\n5. 按「🔍 放大」可放大人體圖、用手指滑動，方便精準對齊。\n6. 拖區塊中間可整塊移動。\n7. 完成後按「💾 儲存並同步」。');
+        window.showNotice('info', '管理員調整模式', '1. 點黃色區塊選取。\n2. 拖綠色點改變形狀。\n3. 拖邊上的小綠點，可新增頂點，讓形狀更貼合人體。\n4. 點綠圈變紅後，按「✕ 刪除點」可刪掉（至少保留 3 點）。\n5. 按「🔍 放大」可放大人體圖（每按一次 2.5×→4×→6×→還原），用手指滑動畫面，方便精準對齊。\n6. 拖區塊中間可整塊移動。\n7. 完成後按「💾 儲存並同步」。');
       } else {
         container.classList.remove('admin-editing');
         bar.classList.remove('active');
@@ -1693,18 +1707,25 @@
     }
 
     // 放大編輯：人體圖放大 2.5 倍，可以上下左右滑動，方便精準對齊輪廓
+    const ZOOM_LEVELS = [1, 2.5, 4, 6];
+    let zoomIdx = 0;
     window.toggleMapZoom = function(force) {
       const sc = document.getElementById('bodyMapScroll');
-      const on = typeof force === 'boolean' ? force : !sc.classList.contains('zoomed');
-      sc.classList.toggle('zoomed', on);
-      const b = document.getElementById('btnZoomMap');
-      if (b) b.innerText = on ? '🔍 縮小' : '🔍 放大';
-      if (on && adminSelPart && bodyPolys[adminSelPart]) {   // 放大後捲到選取的區塊
+      const c = document.getElementById('bodyMapContainer');
+      // 記住目前畫面中心（以圖片百分比），放大後維持在同一個位置
+      let fx = 0.5, fy = 0.5;
+      if (zoomIdx > 0 && c.offsetWidth) { fx = (sc.scrollLeft + sc.clientWidth / 2) / c.offsetWidth; fy = (sc.scrollTop + sc.clientHeight / 2) / c.offsetHeight; }
+      else if (adminSelPart && bodyPolys[adminSelPart]) {
         const pts = bodyPolys[adminSelPart];
-        const cx = pts.reduce((a, p) => a + p[0], 0) / pts.length, cy = pts.reduce((a, p) => a + p[1], 0) / pts.length;
-        const c = document.getElementById('bodyMapContainer');
-        requestAnimationFrame(() => { sc.scrollLeft = c.offsetWidth * cx / 100 - sc.clientWidth / 2; sc.scrollTop = c.offsetHeight * cy / 100 - sc.clientHeight / 2; });
+        fx = pts.reduce((t, p) => t + p[0], 0) / pts.length / 100; fy = pts.reduce((t, p) => t + p[1], 0) / pts.length / 100;
       }
+      zoomIdx = force === false ? 0 : (zoomIdx + 1) % ZOOM_LEVELS.length;
+      const z = ZOOM_LEVELS[zoomIdx];
+      sc.classList.toggle('zoomed', z > 1);
+      c.style.width = z > 1 ? (z * 100) + '%' : '';
+      const btn = document.getElementById('btnZoomMap');
+      if (btn) btn.innerText = z > 1 ? `🔍 ${z}×` : '🔍 放大';
+      if (z > 1) requestAnimationFrame(() => { sc.scrollLeft = c.offsetWidth * fx - sc.clientWidth / 2; sc.scrollTop = c.offsetHeight * fy - sc.clientHeight / 2; });
     };
 
     window.deleteSelectedVertex = function() {
@@ -1902,7 +1923,8 @@
       const x = ((rect.left + rect.width / 2 - parentRect.left) / parentRect.width) * 100;
       const y = ((rect.top + rect.height / 2 - parentRect.top) / parentRect.height) * 100;
 
-      selectedPartsData.push({ part: currentPartName, desc: detail, x: x, y: y });
+      const shape = bodyPolys[currentPartName] ? polyToStr(bodyPolys[currentPartName]) : '';
+      selectedPartsData.push({ part: currentPartName, desc: detail, x: x, y: y, poly: shape });
       currentElement.classList.add('active');
       window.updateInjuredDisplay();
       window.closeInjuryModal();
@@ -1994,12 +2016,7 @@
         ? selectedPartsData.map(i => `<b style="color:#D65A68;">• ${i.part}</b>: ${i.desc}`).join("<br>") 
         : '<span style="color:#888;">無</span>';
 
-      let dotsHtml = '';
-      selectedPartsData.forEach(i => {
-        if(i.x && i.y) {
-          dotsHtml += `<div class="preview-dot" style="top: ${i.y}%; left: ${i.x}%;"></div>`;
-        }
-      });
+      const dotsHtml = injuryOverlayHtml(selectedPartsData);
 
       let vitalsResult = "意識清楚生命徵象穩定";
       if(fd.get('postVitals') === "其他") {
@@ -2554,8 +2571,7 @@
           `;
         } else {
           const parts = (d.treatment && d.treatment.injuredParts) || [];
-          let dots = '';
-          parts.forEach(i => { if(i.x && i.y) dots += `<div class="preview-dot" style="top:${i.y}%; left:${i.x}%;"></div>`; });
+          const dots = injuryOverlayHtml(parts);
           const P = d.patient || {};
           const ga = `${P.gender || ''} ${(P.age && P.age !== '無') ? P.age + '歲' : ''}`.trim();
           const complaint = (d.scene && d.scene.mainComplaint) || '無';
@@ -2689,12 +2705,7 @@
         ? injuredParts.map(i => `<b style="color:#D65A68;">• ${i.part}</b>: ${i.desc}`).join("<br>") 
         : '<span style="color:#888;">無</span>';
 
-      let dotsHtml = '';
-      injuredParts.forEach(i => {
-        if(i.x && i.y) {
-          dotsHtml += `<div class="preview-dot" style="top: ${i.y}%; left: ${i.x}%;"></div>`;
-        }
-      });
+      const dotsHtml = injuryOverlayHtml(injuredParts);
 
       let photosHtml = '';
       if(d.photos && d.photos.length > 0) {
