@@ -90,9 +90,14 @@
          ========================================= */
       .body-map-container { position: relative; width: 100%; max-width: 380px; margin: 0 auto 20px auto; background: #fff; border-radius: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); line-height: 0; }
       .body-map-img { width: 100%; height: auto; display: block; border-radius: 16px; }
-      .body-zone { position: absolute; cursor: pointer; transition: background 0.2s; border: 1px solid transparent; z-index: 10; border-radius: 6px; }
-      .body-zone:hover { background: rgba(214, 90, 104, 0.15); }
-      .body-zone.active { background: rgba(214, 90, 104, 0.55); border: 1.5px solid #D65A68; box-shadow: 0 0 8px rgba(214, 90, 104, 0.5); }
+      .body-zones-svg { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 10; overflow: visible; }
+      .body-zone { fill: transparent; stroke: transparent; stroke-width: 1.5; vector-effect: non-scaling-stroke; cursor: pointer; transition: fill 0.2s; pointer-events: all; -webkit-tap-highlight-color: transparent; }
+      .body-zone:hover { fill: rgba(214, 90, 104, 0.15); }
+      .body-zone.active { fill: rgba(214, 90, 104, 0.55); stroke: #D65A68; }
+      .body-handles { position: absolute; inset: 0; z-index: 120; pointer-events: none; }
+      .poly-vtx { position: absolute; width: 20px; height: 20px; margin: -10px 0 0 -10px; border-radius: 50%; background: #00e676; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.4); pointer-events: auto; touch-action: none; cursor: grab; }
+      .poly-vtx.sel { background: #ff3d00; transform: scale(1.25); }
+      .poly-mid { position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: rgba(255,255,255,0.85); border: 1.5px dashed #00c853; color: #00a152; font-size: 11px; line-height: 11px; text-align: center; font-weight: 900; pointer-events: auto; touch-action: none; cursor: copy; }
       
       .z-f-face { top: 4%; left: 22%; width: 11%; height: 10%; border-radius: 50%; }
       .z-f-neck { top: 14%; left: 24%; width: 7%; height: 5%; }
@@ -139,8 +144,9 @@
       .admin-mode-bar.active { display: flex; flex-direction: column; gap: 8px; }
       .admin-btns-group { display: flex; gap: 6px; width: 100%; justify-content: space-between; }
       .admin-btn { background: #D65A68; color: white; border: none; padding: 8px 12px; border-radius: 8px; font-weight: bold; cursor: pointer; flex: 1; font-size: 12px; }
-      .admin-editing .body-zone { border: 1px dashed #ffeb3b !important; background: rgba(255, 235, 59, 0.25) !important; cursor: move !important; touch-action: none !important; }
-      .admin-editing .body-zone.selected-admin { border: 2px solid #00e676 !important; background: rgba(0, 230, 118, 0.4) !important; z-index: 100 !important; }
+      .admin-editing .body-zones-svg, .admin-editing .body-handles { touch-action: none; }
+      .admin-editing .body-zone { fill: rgba(255, 235, 59, 0.3); stroke: #e0b400; stroke-dasharray: 4 3; cursor: pointer; touch-action: none; }
+      .admin-editing .body-zone.selected-admin { fill: rgba(0, 230, 118, 0.35); stroke: #00c853; stroke-width: 2; stroke-dasharray: none; cursor: move; }
       
       .resize-handle { display: none; position: absolute; width: 12px; height: 12px; background: #00e676; border: 2px solid #fff; border-radius: 50%; z-index: 101; touch-action: none !important; }
       .selected-admin .resize-handle { display: block; }
@@ -646,44 +652,9 @@
           <div class="section-header">受傷部位 (點擊圖示標記)</div>
           <div class="body-map-container" id="bodyMapContainer">
             <img src="https://i.ibb.co/6JFnSZp7/image.jpg" class="body-map-img" alt="body chart">
-            
-            <!-- 正面 -->
-            <div class="body-zone z-f-face" data-part="正面-臉部" onclick="window.toggleBodyPart(this, '正面-臉部')"></div>
-            <div class="body-zone z-f-neck" data-part="正面-脖子" onclick="window.toggleBodyPart(this, '正面-脖子')"></div>
-            <div class="body-zone z-f-chest" data-part="正面-胸口" onclick="window.toggleBodyPart(this, '正面-胸口')"></div>
-            <div class="body-zone z-f-abd" data-part="正面-肚子" onclick="window.toggleBodyPart(this, '正面-肚子')"></div>
-            <div class="body-zone z-f-groin" data-part="正面-會陰" onclick="window.toggleBodyPart(this, '正面-會陰')"></div>
-            <div class="body-zone z-f-r-arm-u" data-part="正面-右上臂" onclick="window.toggleBodyPart(this, '正面-右上臂')"></div>
-            <div class="body-zone z-f-r-arm-l" data-part="正面-右下臂" onclick="window.toggleBodyPart(this, '正面-右下臂')"></div>
-            <div class="body-zone z-f-r-hand" data-part="正面-右手掌" onclick="window.toggleBodyPart(this, '正面-右手掌')"></div>
-            <div class="body-zone z-f-l-arm-u" data-part="正面-左上臂" onclick="window.toggleBodyPart(this, '正面-左上臂')"></div>
-            <div class="body-zone z-f-l-arm-l" data-part="正面-左下臂" onclick="window.toggleBodyPart(this, '正面-左下臂')"></div>
-            <div class="body-zone z-f-l-hand" data-part="正面-左手掌" onclick="window.toggleBodyPart(this, '正面-左手掌')"></div>
-            <div class="body-zone z-f-r-leg-u" data-part="正面-右大腿" onclick="window.toggleBodyPart(this, '正面-右大腿')"></div>
-            <div class="body-zone z-f-r-leg-l" data-part="正面-右小腿" onclick="window.toggleBodyPart(this, '正面-右小腿')"></div>
-            <div class="body-zone z-f-r-foot" data-part="正面-右腳掌" onclick="window.toggleBodyPart(this, '正面-右腳掌')"></div>
-            <div class="body-zone z-f-l-leg-u" data-part="正面-左大腿" onclick="window.toggleBodyPart(this, '正面-左大腿')"></div>
-            <div class="body-zone z-f-l-leg-l" data-part="正面-左小腿" onclick="window.toggleBodyPart(this, '正面-左小腿')"></div>
-            <div class="body-zone z-f-l-foot" data-part="正面-左腳掌" onclick="window.toggleBodyPart(this, '正面-左腳掌')"></div>
-            
-            <!-- 背面 -->
-            <div class="body-zone z-b-head" data-part="背面-頭部" onclick="window.toggleBodyPart(this, '背面-頭部')"></div>
-            <div class="body-zone z-b-neck" data-part="背面-脖子" onclick="window.toggleBodyPart(this, '背面-脖子')"></div>
-            <div class="body-zone z-b-back-u" data-part="背面-上背" onclick="window.toggleBodyPart(this, '背面-上背')"></div>
-            <div class="body-zone z-b-back-l" data-part="背面-下背" onclick="window.toggleBodyPart(this, '背面-下背')"></div>
-            <div class="body-zone z-b-butt" data-part="背面-屁股" onclick="window.toggleBodyPart(this, '背面-屁股')"></div>
-            <div class="body-zone z-b-l-arm-u" data-part="背面-左上臂" onclick="window.toggleBodyPart(this, '背面-左上臂')"></div>
-            <div class="body-zone z-b-l-arm-l" data-part="背面-左下臂" onclick="window.toggleBodyPart(this, '背面-左下臂')"></div>
-            <div class="body-zone z-b-l-hand" data-part="背面-左手掌" onclick="window.toggleBodyPart(this, '背面-左手掌')"></div>
-            <div class="body-zone z-b-r-arm-u" data-part="背面-右上臂" onclick="window.toggleBodyPart(this, '背面-右上臂')"></div>
-            <div class="body-zone z-b-r-arm-l" data-part="背面-右下臂" onclick="window.toggleBodyPart(this, '背面-右下臂')"></div>
-            <div class="body-zone z-b-r-hand" data-part="背面-右手掌" onclick="window.toggleBodyPart(this, '背面-右手掌')"></div>
-            <div class="body-zone z-b-l-leg-u" data-part="背面-左大腿" onclick="window.toggleBodyPart(this, '背面-左大腿')"></div>
-            <div class="body-zone z-b-l-leg-l" data-part="背面-左小腿" onclick="window.toggleBodyPart(this, '背面-左小腿')"></div>
-            <div class="body-zone z-b-l-foot" data-part="背面-左腳掌" onclick="window.toggleBodyPart(this, '背面-左腳掌')"></div>
-            <div class="body-zone z-b-r-leg-u" data-part="背面-右大腿" onclick="window.toggleBodyPart(this, '背面-右大腿')"></div>
-            <div class="body-zone z-b-r-leg-l" data-part="背面-右小腿" onclick="window.toggleBodyPart(this, '背面-右小腿')"></div>
-            <div class="body-zone z-b-r-foot" data-part="背面-右腳掌" onclick="window.toggleBodyPart(this, '背面-右腳掌')"></div>
+            <!-- ★ 受傷部位：多邊形區塊（座標為圖片的百分比，任何裝置都一致） -->
+            <svg id="bodyZonesSvg" class="body-zones-svg" viewBox="0 0 100 100" preserveAspectRatio="none"></svg>
+            <div id="bodyHandles" class="body-handles"></div>
           </div>
           <div id="selectedBodyParts">尚無標記</div>
 
@@ -753,9 +724,10 @@
 
     <!-- 管理員即時控制板 -->
     <div id="adminModeBar" class="admin-mode-bar">
-      <div id="adminStatusText" style="font-family: monospace; color: #ffeb3b; font-weight: bold; font-size: 11px;">點擊區塊：四角縮放、頂端橘點旋轉</div>
+      <div id="adminStatusText" style="color: #ffeb3b; font-weight: bold; font-size: 11px; line-height: 1.5; text-align:center;">點區塊選取 → 拖綠點改形狀、拖白色＋點新增頂點、拖區塊移動</div>
       <div class="admin-btns-group">
-        <button class="admin-btn" style="background:#2196F3;" onclick="window.saveBodyConfigToFirebase()">💾 儲存並同步至資料庫</button>
+        <button class="admin-btn" style="background:#2196F3;" onclick="window.saveBodyConfigToFirebase()">💾 儲存並同步</button>
+        <button class="admin-btn" style="background:#e65100;" id="btnDelVertex" onclick="window.deleteSelectedVertex()">✕ 刪除選取點</button>
         <button class="admin-btn" style="background:#757575;" onclick="window.toggleAdminMode()">關閉模式</button>
       </div>
     </div>
@@ -1083,6 +1055,7 @@
         document.getElementById('submitBtn').style.display = 'none';
       }
       document.querySelector('.content-scroll-area').scrollTop = 0;
+      if (typeof updateAdminAdjustBtn === 'function') updateAdminAdjustBtn();
     };
     window.nextStep = function() { if(currentStep < steps.length - 1) { if(!checkStep(currentStep)) return; completedSteps.add(currentStep); currentStep++; window.updateWizard(); } };
     window.prevStep = function() { if(currentStep > 0) { currentStep--; window.updateWizard(); } };
@@ -1247,7 +1220,7 @@
         // 管理員權限即時切換
         if ((d.role === 'admin') !== (old.role === 'admin')) {
           const isAdminNow = d.role === 'admin';
-          document.querySelector('.admin-top-btn').style.display = isAdminNow ? 'block' : 'none';
+          updateAdminAdjustBtn();
           document.querySelector('.admin-console-btn').style.display = isAdminNow ? 'block' : 'none';
           if (isAdminNow) {
             startAdminUsersLive();
@@ -1281,11 +1254,11 @@
 
       // 檢查是否為管理員
       if (userData.role === 'admin') {
-        document.querySelector('.admin-top-btn').style.display = 'block';
+        updateAdminAdjustBtn();
         document.querySelector('.admin-console-btn').style.display = 'block';
         if (!isOffline) startAdminUsersLive();   // ★ 人員名單即時同步
       } else {
-        document.querySelector('.admin-top-btn').style.display = 'none';
+        updateAdminAdjustBtn();
         document.querySelector('.admin-console-btn').style.display = 'none';
       }
 
@@ -1487,217 +1460,248 @@
       }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
     };
 
+    // =========================================
+    // ★ 受傷部位多邊形：座標 = 圖片寬/高的百分比 (0~100)，電腦、手機顯示一致
+    // =========================================
+    const BODY_ZONE_DEFAULTS = [{"p": "正面-臉部", "c": "z-f-face", "r": [22.0, 4.0, 11.0, 10.0], "e": true}, {"p": "正面-脖子", "c": "z-f-neck", "r": [24.0, 14.0, 7.0, 5.0], "e": false}, {"p": "正面-胸口", "c": "z-f-chest", "r": [18.0, 19.0, 16.0, 11.0], "e": false}, {"p": "正面-肚子", "c": "z-f-abd", "r": [18.0, 31.0, 16.0, 15.0], "e": false}, {"p": "正面-會陰", "c": "z-f-groin", "r": [23.0, 52.0, 8.0, 6.0], "e": false}, {"p": "正面-右上臂", "c": "z-f-r-arm-u", "r": [8.0, 21.0, 9.0, 12.0], "e": false}, {"p": "正面-右下臂", "c": "z-f-r-arm-l", "r": [8.0, 34.0, 8.0, 12.0], "e": false}, {"p": "正面-右手掌", "c": "z-f-r-hand", "r": [5.0, 47.0, 8.0, 8.0], "e": false}, {"p": "正面-左上臂", "c": "z-f-l-arm-u", "r": [33.0, 21.0, 9.0, 12.0], "e": false}, {"p": "正面-左下臂", "c": "z-f-l-arm-l", "r": [37.0, 34.0, 8.0, 12.0], "e": false}, {"p": "正面-左手掌", "c": "z-f-l-hand", "r": [36.0, 47.0, 8.0, 8.0], "e": false}, {"p": "正面-右大腿", "c": "z-f-r-leg-u", "r": [17.0, 55.0, 9.0, 15.0], "e": false}, {"p": "正面-右小腿", "c": "z-f-r-leg-l", "r": [17.0, 70.0, 8.0, 19.0], "e": false}, {"p": "正面-右腳掌", "c": "z-f-r-foot", "r": [15.0, 90.0, 9.0, 6.0], "e": false}, {"p": "正面-左大腿", "c": "z-f-l-leg-u", "r": [26.0, 55.0, 9.0, 15.0], "e": false}, {"p": "正面-左小腿", "c": "z-f-l-leg-l", "r": [27.0, 70.0, 8.0, 19.0], "e": false}, {"p": "正面-左腳掌", "c": "z-f-l-foot", "r": [27.0, 90.0, 9.0, 6.0], "e": false}, {"p": "背面-頭部", "c": "z-b-head", "r": [70.0, 4.0, 10.0, 10.0], "e": true}, {"p": "背面-脖子", "c": "z-b-neck", "r": [71.0, 14.0, 7.0, 5.0], "e": false}, {"p": "背面-上背", "c": "z-b-back-u", "r": [67.0, 19.0, 14.0, 11.0], "e": false}, {"p": "背面-下背", "c": "z-b-back-l", "r": [67.0, 31.0, 14.0, 10.0], "e": false}, {"p": "背面-屁股", "c": "z-b-butt", "r": [67.0, 44.0, 14.0, 9.0], "e": false}, {"p": "背面-左上臂", "c": "z-b-l-arm-u", "r": [58.0, 21.0, 9.0, 12.0], "e": false}, {"p": "背面-左下臂", "c": "z-b-l-arm-l", "r": [57.0, 34.0, 8.0, 12.0], "e": false}, {"p": "背面-左手掌", "c": "z-b-l-hand", "r": [55.0, 47.0, 8.0, 8.0], "e": false}, {"p": "背面-右上臂", "c": "z-b-r-arm-u", "r": [83.0, 21.0, 9.0, 12.0], "e": false}, {"p": "背面-右下臂", "c": "z-b-r-arm-l", "r": [85.0, 34.0, 8.0, 12.0], "e": false}, {"p": "背面-右手掌", "c": "z-b-r-hand", "r": [88.0, 47.0, 8.0, 8.0], "e": false}, {"p": "背面-左大腿", "c": "z-b-l-leg-u", "r": [66.0, 55.0, 8.0, 15.0], "e": false}, {"p": "背面-左小腿", "c": "z-b-l-leg-l", "r": [66.0, 70.0, 8.0, 19.0], "e": false}, {"p": "背面-左腳掌", "c": "z-b-l-foot", "r": [65.0, 90.0, 9.0, 6.0], "e": false}, {"p": "背面-右大腿", "c": "z-b-r-leg-u", "r": [75.0, 55.0, 8.0, 15.0], "e": false}, {"p": "背面-右小腿", "c": "z-b-r-leg-l", "r": [75.0, 70.0, 8.0, 19.0], "e": false}, {"p": "背面-右腳掌", "c": "z-b-r-foot", "r": [76.0, 90.0, 9.0, 6.0], "e": false}];
+    let bodyPolys = {};   // part → [[x,y], ...]
+
+    function rectToPoly(r, ellipse) {
+      const [l, t, w, h] = r;
+      if (ellipse) {
+        const cx = l + w / 2, cy = t + h / 2, pts = [];
+        for (let i = 0; i < 10; i++) { const a = (i / 10) * Math.PI * 2; pts.push([+(cx + Math.cos(a) * w / 2).toFixed(2), +(cy + Math.sin(a) * h / 2).toFixed(2)]); }
+        return pts;
+      }
+      return [[l, t], [l + w, t], [l + w, t + h], [l, t + h]];
+    }
+    function defaultPolys() {
+      const o = {};
+      BODY_ZONE_DEFAULTS.forEach(z => { o[z.p] = rectToPoly(z.r, z.e); });
+      return o;
+    }
+    const polyToStr = pts => pts.map(p => `${(+p[0]).toFixed(2)},${(+p[1]).toFixed(2)}`).join(' ');
+    const strToPoly = s => String(s || '').trim().split(/\s+/).map(t => t.split(',').map(Number)).filter(p => p.length === 2 && p.every(isFinite));
+
+    // 舊版（矩形 + 旋轉）設定 → 多邊形，讓之前調好的位置不會不見
+    function convertOldCss(cssText) {
+      const out = {};
+      const img = document.querySelector('#bodyMapContainer .body-map-img');
+      const aspect = (img && img.naturalWidth && img.naturalHeight) ? img.naturalHeight / img.naturalWidth : 1;
+      BODY_ZONE_DEFAULTS.forEach(z => {
+        const m = new RegExp('\\.' + z.c + '\\s*\\{([^}]*)\\}').exec(cssText);
+        if (!m) return;
+        const g = k => { const r = new RegExp(k + ':\\s*(-?[\\d.]+)%').exec(m[1]); return r ? parseFloat(r[1]) : null; };
+        const l = g('left'), t = g('top'), w = g('width'), h = g('height');
+        if ([l, t, w, h].some(v => v === null)) return;
+        const rot = /rotate\((-?[\d.]+)deg\)/.exec(m[1]);
+        let pts = rectToPoly([l, t, w, h], z.e);
+        if (rot && +rot[1]) {
+          const a = +rot[1] * Math.PI / 180, cx = l + w / 2, cy = t + h / 2;
+          pts = pts.map(([x, y]) => {   // 在實際像素比例下旋轉，避免變形
+            const dx = x - cx, dy = (y - cy) * aspect;
+            const rx = dx * Math.cos(a) - dy * Math.sin(a), ry = dx * Math.sin(a) + dy * Math.cos(a);
+            return [+(cx + rx).toFixed(2), +(cy + ry / aspect).toFixed(2)];
+          });
+        }
+        out[z.p] = pts;
+      });
+      return out;
+    }
+
+    function renderBodyZones() {
+      const svg = document.getElementById('bodyZonesSvg');
+      if (!svg) return;
+      const NS = 'http://www.w3.org/2000/svg';
+      svg.innerHTML = '';
+      BODY_ZONE_DEFAULTS.forEach(z => {
+        const pts = bodyPolys[z.p];
+        if (!pts || pts.length < 3) return;
+        const poly = document.createElementNS(NS, 'polygon');
+        poly.setAttribute('class', 'body-zone');
+        poly.setAttribute('data-part', z.p);
+        poly.setAttribute('points', polyToStr(pts));
+        if (selectedPartsData.some(i => i.part === z.p)) poly.classList.add('active');
+        if (isAdminMode && adminSelPart === z.p) poly.classList.add('selected-admin');
+        poly.addEventListener('click', (e) => {
+          if (isAdminMode) { e.stopPropagation(); selectAdminPart(z.p); return; }
+          window.toggleBodyPart(poly, z.p);
+        });
+        poly.addEventListener('pointerdown', (e) => startPolyMove(e, z.p));
+        svg.appendChild(poly);
+      });
+      renderAdminHandles();
+    }
+
     async function loadBodyConfigFromFirebase() {
       try {
-        const docRef = doc(db, "system_configs", "body_map_coordinates");
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          const cssRules = docSnap.data().cssText;
-          if (cssRules) {
-            document.getElementById('dynamicBodyStyles').innerHTML += cssRules;
-          }
+        const snap = await getDoc(doc(db, "system_configs", "body_map_polygons"));
+        if (snap.exists() && snap.data().zones) {
+          const z = snap.data().zones, o = defaultPolys();
+          Object.keys(z).forEach(k => { const pts = strToPoly(z[k]); if (pts.length >= 3) o[k] = pts; });
+          bodyPolys = o;
+        } else {
+          const old = await getDoc(doc(db, "system_configs", "body_map_coordinates"));
+          bodyPolys = Object.assign(defaultPolys(), (old.exists() && old.data().cssText) ? convertOldCss(old.data().cssText) : {});
         }
+        try { localStorage.setItem('bodyPolysCache', JSON.stringify(bodyPolys)); } catch (e) {}
       } catch (e) {
-        console.log("載入雲端座標失敗:", e);
+        console.log("載入受傷部位設定失敗:", e);
       }
+      renderBodyZones();
     }
 
     window.saveBodyConfigToFirebase = async function() {
-      let cssResult = "";
-      document.querySelectorAll('.body-zone').forEach(zone => {
-        const className = Array.from(zone.classList).find(c => c.startsWith('z-'));
-        const top = zone.style.top;
-        const left = zone.style.left;
-        const width = zone.style.width;
-        const height = zone.style.height;
-        const transform = zone.style.transform;
-        
-        if(top && left && width && height) {
-          const radius = zone.style.borderRadius ? ` border-radius: ${zone.style.borderRadius};` : (className.includes('face') || className.includes('head') ? ' border-radius: 50%;' : '');
-          const rot = transform ? ` transform: ${transform};` : '';
-          cssResult += `.${className} { top: ${top}; left: ${left}; width: ${width}; height: ${height};${rot}${radius}\n}\n`;
-        }
-      });
-
-      if (!cssResult) { window.showNotice('info', '尚未調整', '尚未調整任何區塊！'); return; }
-
+      const zones = {};
+      Object.keys(bodyPolys).forEach(k => { zones[k] = polyToStr(bodyPolys[k]); });
       try {
         document.getElementById('loading').style.display = 'flex';
-        const docRef = doc(db, "system_configs", "body_map_coordinates");
-        await setDoc(docRef, { cssText: cssResult, updatedAt: serverTimestamp() });
+        await setDoc(doc(db, "system_configs", "body_map_polygons"), { zones, updatedAt: serverTimestamp() });
+        try { localStorage.setItem('bodyPolysCache', JSON.stringify(bodyPolys)); } catch (e) {}
         document.getElementById('loading').style.display = 'none';
-        window.showNotice('success', '儲存完成', '座標已同步至資料庫，重整後所有裝置都會更新。');
+        window.showNotice('success', '儲存完成', '受傷部位區塊已同步，所有裝置重新開啟後都會一致。');
       } catch (e) {
         document.getElementById('loading').style.display = 'none';
         window.showNotice('error', '儲存失敗', e.message);
       }
     };
 
+    // 管理員調整按鈕：只有管理員、而且在「急救處置（受傷部位）」這一頁才顯示
+    function updateAdminAdjustBtn() {
+      const btn = document.querySelector('.admin-top-btn');
+      if (!btn) return;
+      const isAdm = !!(currentUserData && currentUserData.role === 'admin');
+      const onPage = steps[currentStep] === 'treatment';
+      btn.style.display = (isAdm && onPage) ? 'block' : 'none';
+      if (!onPage && isAdminMode) window.toggleAdminMode();
+    }
+
     let isAdminMode = false;
     let activeAdminZone = null;
+
+    let adminSelPart = null, adminSelVtx = -1;
 
     window.toggleAdminMode = function() {
       isAdminMode = !isAdminMode;
       const container = document.getElementById('bodyMapContainer');
       const bar = document.getElementById('adminModeBar');
-      
-      if(isAdminMode) {
+      adminSelPart = null; adminSelVtx = -1;
+      if (isAdminMode) {
         container.classList.add('admin-editing');
         bar.classList.add('active');
-        window.showNotice('info', '管理員模式已啟動', '1. 點擊圖塊出現控制點。\n2. 四個綠角可縮放大小。\n3. 頂端橘點可旋轉角度。\n4. 拖曳中心可移動位置。\n5. 調整完畢請點擊「💾 儲存並同步至資料庫」。');
+        window.showNotice('info', '管理員調整模式', '1. 點黃色區塊選取。\n2. 拖綠色點改變形狀。\n3. 拖邊上的白色＋點，可新增頂點，讓形狀更貼合人體。\n4. 點綠點變紅後，按「✕ 刪除選取點」可刪掉（至少保留 3 點）。\n5. 拖區塊中間可整塊移動。\n6. 完成後按「💾 儲存並同步」。');
       } else {
         container.classList.remove('admin-editing');
         bar.classList.remove('active');
-        if(activeAdminZone) activeAdminZone.classList.remove('selected-admin');
-        activeAdminZone = null;
-        window.showNotice('info', '已退出管理員模式', '');
       }
+      renderBodyZones();
     };
 
-    // =========================================
-    // ★ [重要更新] 全面支援手機觸控 (Touch) 拖曳與調整
-    // =========================================
-    function initAdminEditor() {
-      const container = document.getElementById('bodyMapContainer');
-
-      // 取得觸控或滑鼠的座標
-      const getPos = (e) => (e.touches && e.touches.length > 0) ? e.touches[0] : e;
-
-      document.querySelectorAll('.body-zone').forEach(zone => {
-        ['tl', 'tr', 'bl', 'br'].forEach(pos => {
-          const handle = document.createElement('div');
-          handle.className = `resize-handle handle-${pos}`;
-          zone.appendChild(handle);
-        });
-
-        const rotLine = document.createElement('div');
-        rotLine.className = 'rotate-line';
-        const rotHandle = document.createElement('div');
-        rotHandle.className = 'rotate-handle';
-        zone.appendChild(rotLine);
-        zone.appendChild(rotHandle);
-
-        const selectZone = (e) => {
-          if (!isAdminMode) return;
-          e.stopPropagation();
-          document.querySelectorAll('.body-zone').forEach(z => z.classList.remove('selected-admin'));
-          zone.classList.add('selected-admin');
-          activeAdminZone = zone;
-        };
-        zone.addEventListener('click', selectZone);
-
-        let isDragging = false;
-        let startX, startY, initialLeft, initialTop;
-
-        const startDrag = (e) => {
-          if (!isAdminMode || e.target.classList.contains('resize-handle') || e.target.classList.contains('rotate-handle')) return;
-          isDragging = true;
-          const p = getPos(e);
-          startX = p.clientX; startY = p.clientY;
-          initialLeft = parseFloat(zone.style.left) || parsePercent(zone, 'left', container.clientWidth);
-          initialTop = parseFloat(zone.style.top) || parsePercent(zone, 'top', container.clientHeight);
-          e.stopPropagation();
-        };
-        zone.addEventListener('mousedown', startDrag);
-        zone.addEventListener('touchstart', startDrag, { passive: true });
-
-        const doDrag = (e) => {
-          if (!isDragging || !isAdminMode) return;
-          if (e.cancelable) e.preventDefault(); // 防止手機畫面捲動
-          const p = getPos(e);
-          const dx = p.clientX - startX;
-          const dy = p.clientY - startY;
-          zone.style.left = (initialLeft + (dx / container.clientWidth) * 100).toFixed(2) + '%';
-          zone.style.top = (initialTop + (dy / container.clientHeight) * 100).toFixed(2) + '%';
-        };
-        window.addEventListener('mousemove', doDrag);
-        window.addEventListener('touchmove', doDrag, { passive: false });
-
-        const stopDrag = () => { isDragging = false; };
-        window.addEventListener('mouseup', stopDrag);
-        window.addEventListener('touchend', stopDrag);
-
-        // --- 縮放處理 ---
-        zone.querySelectorAll('.resize-handle').forEach(handle => {
-          let isResizing = false;
-          let rStartX, rStartY, initW, initH, initL, initT;
-
-          const startResize = (e) => {
-            if (!isAdminMode) return;
-            isResizing = true;
-            const p = getPos(e);
-            rStartX = p.clientX; rStartY = p.clientY;
-            initW = parseFloat(zone.style.width) || 10;
-            initH = parseFloat(zone.style.height) || 10;
-            initL = parseFloat(zone.style.left) || 0;
-            initT = parseFloat(zone.style.top) || 0;
-            e.stopPropagation();
-          };
-          handle.addEventListener('mousedown', startResize);
-          handle.addEventListener('touchstart', startResize, { passive: true });
-
-          const doResize = (e) => {
-            if (!isResizing || !isAdminMode) return;
-            if (e.cancelable) e.preventDefault();
-            const p = getPos(e);
-            const dx = ((p.clientX - rStartX) / container.clientWidth) * 100;
-            const dy = ((p.clientY - rStartY) / container.clientHeight) * 100;
-
-            if (handle.classList.contains('handle-br')) {
-              zone.style.width = Math.max(2, initW + dx) + '%';
-              zone.style.height = Math.max(2, initH + dy) + '%';
-            } else if (handle.classList.contains('handle-bl')) {
-              zone.style.width = Math.max(2, initW - dx) + '%';
-              zone.style.left = (initL + dx) + '%';
-              zone.style.height = Math.max(2, initH + dy) + '%';
-            } else if (handle.classList.contains('handle-tr')) {
-              zone.style.width = Math.max(2, initW + dx) + '%';
-              zone.style.height = Math.max(2, initH - dy) + '%';
-              zone.style.top = (initT + dy) + '%';
-            } else if (handle.classList.contains('handle-tl')) {
-              zone.style.width = Math.max(2, initW - dx) + '%';
-              zone.style.left = (initL + dx) + '%';
-              zone.style.height = Math.max(2, initH - dy) + '%';
-              zone.style.top = (initT + dy) + '%';
-            }
-          };
-          window.addEventListener('mousemove', doResize);
-          window.addEventListener('touchmove', doResize, { passive: false });
-
-          const stopResize = () => { isResizing = false; };
-          window.addEventListener('mouseup', stopResize);
-          window.addEventListener('touchend', stopResize);
-        });
-
-        // --- 旋轉處理 ---
-        let isRotating = false;
-        const startRotate = (e) => {
-          if (!isAdminMode) return;
-          isRotating = true;
-          e.stopPropagation();
-        };
-        rotHandle.addEventListener('mousedown', startRotate);
-        rotHandle.addEventListener('touchstart', startRotate, { passive: true });
-
-        const doRotate = (e) => {
-          if (!isRotating || !isAdminMode) return;
-          if (e.cancelable) e.preventDefault();
-          const p = getPos(e);
-          const rect = zone.getBoundingClientRect();
-          const centerX = rect.left + rect.width / 2;
-          const centerY = rect.top + rect.height / 2;
-          const radians = Math.atan2(p.clientY - centerY, p.clientX - centerX);
-          let deg = Math.round(radians * (180 / Math.PI) + 90);
-          zone.style.transform = `rotate(${deg}deg)`;
-        };
-        window.addEventListener('mousemove', doRotate);
-        window.addEventListener('touchmove', doRotate, { passive: false });
-
-        const stopRotate = () => { isRotating = false; };
-        window.addEventListener('mouseup', stopRotate);
-        window.addEventListener('touchend', stopRotate);
-      });
+    function selectAdminPart(part) {
+      adminSelPart = part; adminSelVtx = -1;
+      document.getElementById('adminStatusText').innerText = `已選取：${part}（${(bodyPolys[part] || []).length} 個點）`;
+      renderBodyZones();
     }
+
+    const pctPoint = (e) => {
+      const r = document.getElementById('bodyMapContainer').getBoundingClientRect();
+      return [Math.max(0, Math.min(100, (e.clientX - r.left) / r.width * 100)), Math.max(0, Math.min(100, (e.clientY - r.top) / r.height * 100))];
+    };
+
+    // 拖動頂點 / 新增頂點 / 整塊移動，全部用 Pointer Events（滑鼠、手指都適用）
+    function trackPointer(e, onMove, onEnd) {
+      e.preventDefault(); e.stopPropagation();
+      const el = e.currentTarget;
+      try { el.setPointerCapture(e.pointerId); } catch (err) {}
+      const move = (ev) => { ev.preventDefault(); onMove(pctPoint(ev)); };
+      const up = () => { el.removeEventListener('pointermove', move); el.removeEventListener('pointerup', up); el.removeEventListener('pointercancel', up); if (onEnd) onEnd(); };
+      el.addEventListener('pointermove', move);
+      el.addEventListener('pointerup', up);
+      el.addEventListener('pointercancel', up);
+    }
+
+    function startPolyMove(e, part) {
+      if (!isAdminMode || adminSelPart !== part) return;
+      const start = pctPoint(e), orig = bodyPolys[part].map(p => p.slice());
+      let moved = false;
+      const layer = document.getElementById('bodyHandles');
+      trackPointer(e, ([x, y]) => {
+        const dx = x - start[0], dy = y - start[1];
+        if (!moved && Math.abs(dx) + Math.abs(dy) > 0.3) { moved = true; layer.style.visibility = 'hidden'; }
+        bodyPolys[part] = orig.map(([px, py]) => [+(px + dx).toFixed(2), +(py + dy).toFixed(2)]);
+        updatePolyDom(part);
+      }, () => { layer.style.visibility = ''; renderAdminHandles(); });
+    }
+
+    function updatePolyDom(part) {
+      const poly = document.querySelector(`#bodyZonesSvg .body-zone[data-part="${part}"]`);
+      if (poly) poly.setAttribute('points', polyToStr(bodyPolys[part]));
+    }
+
+    function renderAdminHandles() {
+      const layer = document.getElementById('bodyHandles');
+      if (!layer) return;
+      layer.innerHTML = '';
+      if (!isAdminMode || !adminSelPart || !bodyPolys[adminSelPart]) return;
+      const pts = bodyPolys[adminSelPart];
+      // 邊的中點：拖一下就在那裡新增一個頂點
+      pts.forEach((p, i) => {
+        const q = pts[(i + 1) % pts.length];
+        const m = document.createElement('div');
+        m.className = 'poly-mid'; m.textContent = '+';
+        m.style.left = ((p[0] + q[0]) / 2) + '%'; m.style.top = ((p[1] + q[1]) / 2) + '%';
+        m.addEventListener('pointerdown', (e) => {
+          const idx = i + 1, part = adminSelPart;
+          bodyPolys[part].splice(idx, 0, [+((p[0] + q[0]) / 2).toFixed(2), +((p[1] + q[1]) / 2).toFixed(2)]);
+          adminSelVtx = idx;
+          updatePolyDom(part);
+          m.className = 'poly-vtx sel'; m.textContent = '';
+          layer.querySelectorAll('.poly-mid').forEach(x => { if (x !== m) x.style.display = 'none'; });
+          trackPointer(e, ([x, y]) => { bodyPolys[part][idx] = [+x.toFixed(2), +y.toFixed(2)]; updatePolyDom(part); m.style.left = x + '%'; m.style.top = y + '%'; }, () => renderAdminHandles());
+        });
+        layer.appendChild(m);
+      });
+      // 頂點：拖動改形狀，點一下選取（可刪除）
+      pts.forEach((p, i) => {
+        const v = document.createElement('div');
+        v.className = 'poly-vtx' + (i === adminSelVtx ? ' sel' : '');
+        v.style.left = p[0] + '%'; v.style.top = p[1] + '%';
+        v.addEventListener('pointerdown', (e) => {
+          adminSelVtx = i;
+          const part = adminSelPart;
+          layer.querySelectorAll('.poly-vtx').forEach((x, j) => x.classList.toggle('sel', j === i));
+          layer.querySelectorAll('.poly-mid').forEach(x => x.style.display = 'none');
+          trackPointer(e, ([x, y]) => { bodyPolys[part][i] = [+x.toFixed(2), +y.toFixed(2)]; updatePolyDom(part); v.style.left = x + '%'; v.style.top = y + '%'; }, () => renderAdminHandles());
+        });
+        layer.appendChild(v);
+      });
+      document.getElementById('adminStatusText').innerText = `已選取：${adminSelPart}（${pts.length} 個點）${adminSelVtx >= 0 ? '・紅點可刪除' : ''}`;
+    }
+
+    window.deleteSelectedVertex = function() {
+      if (!adminSelPart || adminSelVtx < 0) { window.showNotice('info', '請先選取頂點', '點一下要刪除的綠色點（會變成紅色），再按刪除。'); return; }
+      const pts = bodyPolys[adminSelPart];
+      if (pts.length <= 3) { window.showNotice('info', '無法刪除', '每個區塊至少要保留 3 個點。'); return; }
+      pts.splice(adminSelVtx, 1);
+      adminSelVtx = -1;
+      renderBodyZones();
+    };
+
+    // 點空白處：取消選取
+    document.getElementById('bodyMapContainer').addEventListener('click', (e) => {
+      if (isAdminMode && !e.target.closest('.body-zone') && !e.target.closest('.poly-vtx') && !e.target.closest('.poly-mid')) {
+        adminSelPart = null; adminSelVtx = -1;
+        document.getElementById('adminStatusText').innerText = '點區塊選取 → 拖綠點改形狀、拖白色＋點新增頂點、拖區塊移動';
+        renderBodyZones();
+      }
+    });
+
+    // 舊版編輯器已由多邊形編輯取代
+    function initAdminEditor() {}
+
+    // 一開始先畫出預設 / 本機快取的區塊（離線也能用），登入後再換成雲端設定
+    try { const c = JSON.parse(localStorage.getItem('bodyPolysCache') || 'null'); bodyPolys = (c && typeof c === 'object') ? Object.assign(defaultPolys(), c) : defaultPolys(); } catch (e) { bodyPolys = defaultPolys(); }
+    setTimeout(renderBodyZones, 0);
 
     function parsePercent(el, prop, totalSize) {
       const val = parseFloat(window.getComputedStyle(el)[prop]) || 0;
