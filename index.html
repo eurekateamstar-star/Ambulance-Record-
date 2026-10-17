@@ -95,9 +95,17 @@
       .body-zone:hover { fill: rgba(214, 90, 104, 0.15); }
       .body-zone.active { fill: rgba(214, 90, 104, 0.55); stroke: #D65A68; }
       .body-handles { position: absolute; inset: 0; z-index: 120; pointer-events: none; }
-      .poly-vtx { position: absolute; width: 20px; height: 20px; margin: -10px 0 0 -10px; border-radius: 50%; background: #00e676; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.4); pointer-events: auto; touch-action: none; cursor: grab; }
-      .poly-vtx.sel { background: #ff3d00; transform: scale(1.25); }
-      .poly-mid { position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: rgba(255,255,255,0.85); border: 1.5px dashed #00c853; color: #00a152; font-size: 11px; line-height: 11px; text-align: center; font-weight: 900; pointer-events: auto; touch-action: none; cursor: copy; }
+      /* 控制點：觸控範圍 28px（透明），看得到的只有中間 8px 空心圓，不會擋住人體線條 */
+      .poly-vtx { position: absolute; width: 28px; height: 28px; margin: -14px 0 0 -14px; background: transparent; pointer-events: auto; touch-action: none; cursor: grab; }
+      .poly-vtx::after { content: ''; position: absolute; left: 50%; top: 50%; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%; border: 1.5px solid #00c853; box-shadow: 0 0 0 1px rgba(255,255,255,0.9); background: transparent; box-sizing: border-box; }
+      .poly-vtx.sel::after { width: 10px; height: 10px; margin: -5px 0 0 -5px; border: 2px solid #ff3d00; }
+      .poly-mid { position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px; background: transparent; pointer-events: auto; touch-action: none; cursor: copy; }
+      .poly-mid::after { content: ''; position: absolute; left: 50%; top: 50%; width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px; border-radius: 50%; background: rgba(0, 200, 83, 0.55); }
+      /* 放大編輯 */
+      .body-map-scroll { max-width: 380px; margin: 0 auto 20px auto; }
+      .body-map-scroll .body-map-container { margin: 0 auto; }
+      .body-map-scroll.zoomed { max-width: 100%; overflow: auto; max-height: 68vh; border-radius: 16px; -webkit-overflow-scrolling: touch; box-shadow: inset 0 0 0 2px #00c853; }
+      .body-map-scroll.zoomed .body-map-container { width: 250%; max-width: none; }
       
       .z-f-face { top: 4%; left: 22%; width: 11%; height: 10%; border-radius: 50%; }
       .z-f-neck { top: 14%; left: 24%; width: 7%; height: 5%; }
@@ -144,9 +152,8 @@
       .admin-mode-bar.active { display: flex; flex-direction: column; gap: 8px; }
       .admin-btns-group { display: flex; gap: 6px; width: 100%; justify-content: space-between; }
       .admin-btn { background: #D65A68; color: white; border: none; padding: 8px 12px; border-radius: 8px; font-weight: bold; cursor: pointer; flex: 1; font-size: 12px; }
-      .admin-editing .body-zones-svg, .admin-editing .body-handles { touch-action: none; }
-      .admin-editing .body-zone { fill: rgba(255, 235, 59, 0.3); stroke: #e0b400; stroke-dasharray: 4 3; cursor: pointer; touch-action: none; }
-      .admin-editing .body-zone.selected-admin { fill: rgba(0, 230, 118, 0.35); stroke: #00c853; stroke-width: 2; stroke-dasharray: none; cursor: move; }
+      .admin-editing .body-zone { fill: rgba(255, 235, 59, 0.16); stroke: #e0b400; stroke-width: 1; stroke-dasharray: 4 3; cursor: pointer; }
+      .admin-editing .body-zone.selected-admin { fill: rgba(0, 230, 118, 0.12); stroke: #00c853; stroke-width: 1; stroke-dasharray: none; cursor: move; touch-action: none; }
       
       .resize-handle { display: none; position: absolute; width: 12px; height: 12px; background: #00e676; border: 2px solid #fff; border-radius: 50%; z-index: 101; touch-action: none !important; }
       .selected-admin .resize-handle { display: block; }
@@ -650,11 +657,13 @@
         <div id="tab-treatment" class="tab-content">
           
           <div class="section-header">受傷部位 (點擊圖示標記)</div>
+          <div class="body-map-scroll" id="bodyMapScroll">
           <div class="body-map-container" id="bodyMapContainer">
             <img src="https://i.ibb.co/6JFnSZp7/image.jpg" class="body-map-img" alt="body chart">
             <!-- ★ 受傷部位：多邊形區塊（座標為圖片的百分比，任何裝置都一致） -->
             <svg id="bodyZonesSvg" class="body-zones-svg" viewBox="0 0 100 100" preserveAspectRatio="none"></svg>
             <div id="bodyHandles" class="body-handles"></div>
+          </div>
           </div>
           <div id="selectedBodyParts">尚無標記</div>
 
@@ -724,10 +733,11 @@
 
     <!-- 管理員即時控制板 -->
     <div id="adminModeBar" class="admin-mode-bar">
-      <div id="adminStatusText" style="color: #ffeb3b; font-weight: bold; font-size: 11px; line-height: 1.5; text-align:center;">點區塊選取 → 拖綠點改形狀、拖白色＋點新增頂點、拖區塊移動</div>
+      <div id="adminStatusText" style="color: #ffeb3b; font-weight: bold; font-size: 11px; line-height: 1.5; text-align:center;">點區塊選取 → 拖綠圈改形狀、拖邊上小點新增頂點</div>
       <div class="admin-btns-group">
         <button class="admin-btn" style="background:#2196F3;" onclick="window.saveBodyConfigToFirebase()">💾 儲存並同步</button>
-        <button class="admin-btn" style="background:#e65100;" id="btnDelVertex" onclick="window.deleteSelectedVertex()">✕ 刪除選取點</button>
+        <button class="admin-btn" style="background:#00897b;" id="btnZoomMap" onclick="window.toggleMapZoom()">🔍 放大</button>
+        <button class="admin-btn" style="background:#e65100;" id="btnDelVertex" onclick="window.deleteSelectedVertex()">✕ 刪除點</button>
         <button class="admin-btn" style="background:#757575;" onclick="window.toggleAdminMode()">關閉模式</button>
       </div>
     </div>
@@ -1592,10 +1602,11 @@
       if (isAdminMode) {
         container.classList.add('admin-editing');
         bar.classList.add('active');
-        window.showNotice('info', '管理員調整模式', '1. 點黃色區塊選取。\n2. 拖綠色點改變形狀。\n3. 拖邊上的白色＋點，可新增頂點，讓形狀更貼合人體。\n4. 點綠點變紅後，按「✕ 刪除選取點」可刪掉（至少保留 3 點）。\n5. 拖區塊中間可整塊移動。\n6. 完成後按「💾 儲存並同步」。');
+        window.showNotice('info', '管理員調整模式', '1. 點黃色區塊選取。\n2. 拖綠色點改變形狀。\n3. 拖邊上的小綠點，可新增頂點，讓形狀更貼合人體。\n4. 點綠圈變紅後，按「✕ 刪除點」可刪掉（至少保留 3 點）。\n5. 按「🔍 放大」可放大人體圖、用手指滑動，方便精準對齊。\n6. 拖區塊中間可整塊移動。\n7. 完成後按「💾 儲存並同步」。');
       } else {
         container.classList.remove('admin-editing');
         bar.classList.remove('active');
+        window.toggleMapZoom(false);
       }
       renderBodyZones();
     };
@@ -1651,7 +1662,7 @@
       pts.forEach((p, i) => {
         const q = pts[(i + 1) % pts.length];
         const m = document.createElement('div');
-        m.className = 'poly-mid'; m.textContent = '+';
+        m.className = 'poly-mid';
         m.style.left = ((p[0] + q[0]) / 2) + '%'; m.style.top = ((p[1] + q[1]) / 2) + '%';
         m.addEventListener('pointerdown', (e) => {
           const idx = i + 1, part = adminSelPart;
@@ -1681,6 +1692,21 @@
       document.getElementById('adminStatusText').innerText = `已選取：${adminSelPart}（${pts.length} 個點）${adminSelVtx >= 0 ? '・紅點可刪除' : ''}`;
     }
 
+    // 放大編輯：人體圖放大 2.5 倍，可以上下左右滑動，方便精準對齊輪廓
+    window.toggleMapZoom = function(force) {
+      const sc = document.getElementById('bodyMapScroll');
+      const on = typeof force === 'boolean' ? force : !sc.classList.contains('zoomed');
+      sc.classList.toggle('zoomed', on);
+      const b = document.getElementById('btnZoomMap');
+      if (b) b.innerText = on ? '🔍 縮小' : '🔍 放大';
+      if (on && adminSelPart && bodyPolys[adminSelPart]) {   // 放大後捲到選取的區塊
+        const pts = bodyPolys[adminSelPart];
+        const cx = pts.reduce((a, p) => a + p[0], 0) / pts.length, cy = pts.reduce((a, p) => a + p[1], 0) / pts.length;
+        const c = document.getElementById('bodyMapContainer');
+        requestAnimationFrame(() => { sc.scrollLeft = c.offsetWidth * cx / 100 - sc.clientWidth / 2; sc.scrollTop = c.offsetHeight * cy / 100 - sc.clientHeight / 2; });
+      }
+    };
+
     window.deleteSelectedVertex = function() {
       if (!adminSelPart || adminSelVtx < 0) { window.showNotice('info', '請先選取頂點', '點一下要刪除的綠色點（會變成紅色），再按刪除。'); return; }
       const pts = bodyPolys[adminSelPart];
@@ -1694,7 +1720,7 @@
     document.getElementById('bodyMapContainer').addEventListener('click', (e) => {
       if (isAdminMode && !e.target.closest('.body-zone') && !e.target.closest('.poly-vtx') && !e.target.closest('.poly-mid')) {
         adminSelPart = null; adminSelVtx = -1;
-        document.getElementById('adminStatusText').innerText = '點區塊選取 → 拖綠點改形狀、拖白色＋點新增頂點、拖區塊移動';
+        document.getElementById('adminStatusText').innerText = '點區塊選取 → 拖綠圈改形狀、拖邊上小點新增頂點';
         renderBodyZones();
       }
     });
