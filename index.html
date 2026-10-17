@@ -876,7 +876,7 @@
   <!-- ★ 人員分類選擇視窗 ★ -->
   <div id="userCatModal" class="modal-overlay top-z">
     <div class="modal-card">
-      <div class="modal-title">設定分類</div>
+      <div class="modal-title" id="userCatTitle">設定分類</div>
       <div id="userCatName" style="font-size:12px; color:#64748b; text-align:center; margin-bottom:4px;"></div>
       <div id="userCatGrid" class="ucat-grid"></div>
       <div class="modal-btns">
@@ -3074,6 +3074,15 @@
       [...cats.entries()].sort((a, b) => a[0].localeCompare(b[0], 'zh-Hant')).forEach(([c, n]) => mk(c, '🏷️ ' + c, n));
       const none = users.filter(u => !auCat(u)).length;
       if (none && cats.size) mk('__none', '未分類', none);
+      if (cats.size) {
+        const rb = document.createElement('button');
+        rb.type = 'button';
+        rb.className = 'u-chip';
+        rb.style.cssText = 'border-style:dashed; color:#7c3aed;';
+        rb.textContent = '✏️ 改分類名稱';
+        rb.onclick = () => window.openCategoryRename();
+        el.appendChild(rb);
+      }
     }
 
     function adminUserCardHtml(u) {
@@ -3235,6 +3244,7 @@
     window.openUserCategory = function(userId) {
       const u = adminUsersMap[userId];
       if (!u) return;
+      document.getElementById('userCatTitle').textContent = '設定分類';
       document.getElementById('userCatName').textContent = `「${u.realName || ''}」目前：${auCat(u) || '未分類'}`;
       const grid = document.getElementById('userCatGrid');
       grid.innerHTML = '';
@@ -3257,6 +3267,47 @@
       add('未分類', '', () => window.setUserCategory(userId, ''));
       document.getElementById('userCatModal').style.display = 'flex';
     };
+    // ★ 修改分類名稱：屬於這個分類的人一起改（倉庫也同步）
+    window.openCategoryRename = function() {
+      const cats = new Map();
+      (adminUsersCache || []).forEach(x => { const c = auCat(x); if (c) cats.set(c, (cats.get(c) || 0) + 1); });
+      if (!cats.size) return;
+      document.getElementById('userCatTitle').textContent = '修改分類名稱';
+      document.getElementById('userCatName').textContent = '點選要改名的分類';
+      const grid = document.getElementById('userCatGrid');
+      grid.innerHTML = '';
+      [...cats.entries()].sort((a, b) => a[0].localeCompare(b[0], 'zh-Hant')).forEach(([c, n]) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'ucat-btn';
+        btn.textContent = `${c}（${n}）`;
+        btn.onclick = async () => {
+          window.closeUserCategory();
+          const nn = await askReason(`把「${c}」改成：`, '新的分類名稱', true, ['請輸入分類名稱', '分類名稱不可空白。'], c);
+          if (nn) window.renameCategory(c, nn.trim());
+        };
+        grid.appendChild(btn);
+      });
+      document.getElementById('userCatModal').style.display = 'flex';
+    };
+    window.renameCategory = async function(oldName, newName) {
+      if (!newName || newName === oldName) return;
+      const list = adminUsersCache || [];
+      const targets = list.filter(u => auCat(u) === oldName);
+      if (list.some(u => auCat(u) === newName) &&
+          !(await window.showConfirm('合併分類？', `已經有「${newName}」這個分類，要把「${oldName}」的 ${targets.length} 人併入嗎？`))) return;
+      try {
+        document.getElementById('loading').style.display = 'flex';
+        await Promise.all(targets.map(u => updateDoc(doc(db, "users", u.id), { category: newName, warehouseCategory: newName })));
+        document.getElementById('loading').style.display = 'none';
+        if (adminUserCat === oldName) adminUserCat = newName;
+        window.showNotice('success', '修改完成', `已將「${oldName}」改為「${newName}」，共 ${targets.length} 人`);
+      } catch (e) {
+        document.getElementById('loading').style.display = 'none';
+        window.showNotice('error', '修改失敗', e.message);
+      }
+    };
+
     window.closeUserCategory = function() {
       document.getElementById('userCatModal').style.display = 'none';
     };
@@ -3279,14 +3330,14 @@
     let reasonResolver = null;
     let reasonRequired = false;
     let reasonEmptyMsg = null;
-    function askReason(title, placeholder, required, emptyMsg) {
+    function askReason(title, placeholder, required, emptyMsg, defaultValue) {
       return new Promise(resolve => {
         reasonResolver = resolve;
         reasonRequired = !!required;
         reasonEmptyMsg = emptyMsg || null;
         document.getElementById('reasonModalTitle').innerText = title;
         document.getElementById('reasonModalInput').placeholder = placeholder || '請輸入原因';
-        document.getElementById('reasonModalInput').value = '';
+        document.getElementById('reasonModalInput').value = defaultValue || '';
         document.getElementById('reasonModal').style.display = 'flex';
         setTimeout(() => document.getElementById('reasonModalInput').focus(), 100);
       });
