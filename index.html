@@ -995,7 +995,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js";
-    import { initializeFirestore, persistentLocalCache, collection, addDoc, getDocs, doc, getDoc, setDoc, deleteDoc, updateDoc, query, orderBy, limit, serverTimestamp } 
+    import { initializeFirestore, persistentLocalCache, collection, addDoc, getDocs, doc, getDoc, setDoc, deleteDoc, updateDoc, query, orderBy, limit, serverTimestamp, onSnapshot } 
     from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     const firebaseConfig = {
@@ -1095,6 +1095,7 @@
 
         currentUserProfile = await liff.getProfile();
         await checkUserAuth(currentUserProfile);
+        watchOwnUser(currentUserProfile);
 
       } catch (err) {
         console.warn("連線或 LIFF 失敗，嘗試使用離線快取:", err);
@@ -1134,6 +1135,7 @@
           if (userData.status === 'approved') {
             // ✅ 審核通過：進入系統，並把身分快取起來 (為了離線模式)
             localStorage.setItem('sfc_user_cache', JSON.stringify(userData));
+            updateDoc(userRef, { bstLastLoginAt: serverTimestamp() }).catch(() => {});   // ★ 白沙屯最後登入時間
             enterSystem(userData, false);
 
           } else if (userData.status === 'banned') {
@@ -1167,8 +1169,68 @@
       }
     }
 
+    // ===== ★ 即時監看自己的帳號：核准 / 退回 / 停權 / 刪除 / 管理員權限 / 改名，立刻生效 =====
+    let ownUserUnsub = null;
+    function watchOwnUser(profile) {
+      if (!profile || ownUserUnsub) return;
+      let first = true;
+      ownUserUnsub = onSnapshot(doc(db, "users", profile.userId), (snap) => {
+        if (first) { first = false; return; }   // 第一次是目前狀態，checkUserAuth 已處理
+        if (snap.metadata && snap.metadata.hasPendingWrites) return;
+        if (!snap.exists()) {
+          localStorage.removeItem('sfc_user_cache');
+          if (inSystem) { location.reload(); return; }
+          checkUserAuth(profile);
+          return;
+        }
+        const d = snap.data();
+        const old = currentUserData || {};
+        currentUserData = d;
+
+        if (!inSystem) {
+          // 還在登入畫面：使用者正在填表就不打斷；否則依新狀態切換畫面（例如被核准就直接進入）
+          const formOpen = document.getElementById('authRegister').style.display === 'block';
+          if (formOpen && d.status !== 'approved') return;
+          checkUserAuth(profile);
+          return;
+        }
+
+        if (d.status !== 'approved') {
+          localStorage.removeItem('sfc_user_cache');
+          location.reload();
+          return;
+        }
+        localStorage.setItem('sfc_user_cache', JSON.stringify(d));
+
+        // 姓名被修改：表單人員欄位還是舊名字時跟著更新
+        if (d.realName && d.realName !== old.realName) {
+          const pi = document.getElementById('personnelInput');
+          if (pi && (!pi.value || pi.value === old.realName)) pi.value = d.realName;
+        }
+
+        // 管理員權限即時切換
+        if ((d.role === 'admin') !== (old.role === 'admin')) {
+          const isAdminNow = d.role === 'admin';
+          document.querySelector('.admin-top-btn').style.display = isAdminNow ? 'block' : 'none';
+          document.querySelector('.admin-console-btn').style.display = isAdminNow ? 'block' : 'none';
+          if (isAdminNow) {
+            startAdminUsersLive();
+            window.showNotice('success', '權限已更新', '你已被設為管理員，可以使用主控台。');
+          } else {
+            stopAdminUsersLive();
+            const ov = document.getElementById('adminConsoleOverlay');
+            if (ov) ov.style.display = 'none';
+            document.querySelectorAll('.modal-overlay').forEach(m => { if (m.id === 'userEditModal' || m.id === 'userCatModal' || m.id === 'reasonModal') m.style.display = 'none'; });
+            window.showNotice('error', '權限已更新', '你的管理員權限已被取消。');
+          }
+        }
+      }, (e) => console.warn('帳號即時同步失敗:', e));
+    }
+
     // 進入系統主畫面 (共用邏輯)
+    let inSystem = false;
     async function enterSystem(userData, isOffline) {
+      inSystem = true;
       document.getElementById('authScreen').style.display = 'none';
       document.getElementById('mainAppContainer').style.display = 'flex';
       
@@ -1185,7 +1247,7 @@
       if (userData.role === 'admin') {
         document.querySelector('.admin-top-btn').style.display = 'block';
         document.querySelector('.admin-console-btn').style.display = 'block';
-        if (!isOffline) fetchAdminUsers().catch(() => {});   // ★ 預先載入人員名單，開啟人員分頁時不用等
+        if (!isOffline) startAdminUsersLive();   // ★ 人員名單即時同步
       } else {
         document.querySelector('.admin-top-btn').style.display = 'none';
         document.querySelector('.admin-console-btn').style.display = 'none';
@@ -2889,27 +2951,46 @@
     let adminUsersCache = null;     // ★ 人員名單快取（只存在記憶體，不寫入本機儲存）
     let adminUsersInflight = null;
 
-    // 向資料庫抓取所有使用者並排序
+    // ★ 人員名單即時同步（onSnapshot）：任何人登入、送審、被核准、改名、刪除，畫面立刻更新
+    let adminUsersUnsub = null;
+    let adminUsersReady = null, adminUsersReadyResolve = null;
+    function sortUsers(list) {
+      const statusOrder = { 'pending': 1, 'approved': 2, 'rejected': 3, 'banned': 4 };
+      return list.sort((a, b) => (statusOrder[a.status] || 99) - (statusOrder[b.status] || 99));
+    }
+    function startAdminUsersLive() {
+      if (adminUsersUnsub) return adminUsersReady;
+      adminUsersReady = new Promise(r => { adminUsersReadyResolve = r; });
+      let firstSnap = true;
+      adminUsersUnsub = onSnapshot(collection(db, "users"), (snapshot) => {
+        const prevPending = new Set((adminUsersCache || []).filter(u => u.status === 'pending').map(u => u.id));
+        const list = [];
+        snapshot.forEach(docSnap => list.push({ id: docSnap.id, ...docSnap.data() }));
+        adminUsersCache = sortUsers(list);
+        if (adminUsersReadyResolve) { adminUsersReadyResolve(adminUsersCache); adminUsersReadyResolve = null; }
+        if (!firstSnap) {
+          const newcomers = adminUsersCache.filter(u => u.status === 'pending' && !prevPending.has(u.id));
+          if (newcomers.length) window.showNotice('info', '新人員申請', newcomers.map(u => u.realName || u.lineDisplayName || '').join('、') + ' 送出申請，等待審核');
+        }
+        firstSnap = false;
+        const panel = document.getElementById('panel-users');
+        const ov = document.getElementById('adminConsoleOverlay');
+        if (panel && panel.classList.contains('active') && ov && ov.style.display !== 'none') renderAdminUsers(adminUsersCache);
+      }, (e) => {
+        console.warn('人員名單即時同步失敗:', e);
+        if (adminUsersReadyResolve) { adminUsersReadyResolve(adminUsersCache || []); adminUsersReadyResolve = null; }
+        adminUsersUnsub = null;
+      });
+      return adminUsersReady;
+    }
+    function stopAdminUsersLive() {
+      if (adminUsersUnsub) { adminUsersUnsub(); adminUsersUnsub = null; }
+      adminUsersCache = null;
+    }
+    // 保留舊名稱：回傳目前（即時）名單
     function fetchAdminUsers(force) {
-      if (adminUsersInflight && !force) return adminUsersInflight;
-      const p = (async () => {
-        const snapshot = await getDocs(query(collection(db, "users")));
-        const usersList = [];
-        snapshot.forEach(docSnap => {
-          usersList.push({ id: docSnap.id, ...docSnap.data() });
-        });
-        // 排序：待審核(pending)放最上面 -> 已核准(approved) -> 退回(rejected) -> 停權(banned)
-        usersList.sort((a, b) => {
-          const statusOrder = { 'pending': 1, 'approved': 2, 'rejected': 3, 'banned': 4 };
-          return (statusOrder[a.status] || 99) - (statusOrder[b.status] || 99);
-        });
-        adminUsersCache = usersList;
-        return usersList;
-      })();
-      adminUsersInflight = p;
-      const clear = () => { if (adminUsersInflight === p) adminUsersInflight = null; };
-      p.then(clear, clear);
-      return p;
+      if (adminUsersUnsub && adminUsersCache) return Promise.resolve(adminUsersCache);
+      return startAdminUsersLive();
     }
 
     // 載入所有使用者（useCache = true：先秒顯示快取，再背景更新）
@@ -2991,8 +3072,9 @@
       // 倉庫的登入 / 操作時間（唯讀）
       let whLines = '';
       if (u.status === 'approved') {
-        const li = auTs(u.warehouseLastLoginAt), la = auTs(u.warehouseLastActionAt);
+        const li = auTs(u.warehouseLastLoginAt), la = auTs(u.warehouseLastActionAt), bl = auTs(u.bstLastLoginAt);
         whLines = `
+          <div class="user-row-id" style="color:#be123c; font-family:inherit;">🏥 白沙屯上次登入：${bl ? `${auFmt(bl)}（${auRel(bl)}）` : '尚無紀錄'}</div>
           <div class="user-row-id" style="color:#b45309; font-family:inherit;">🕒 倉庫上次登入：${li ? `${auFmt(li)}（${auRel(li)}）` : '尚無紀錄'}</div>
           <div class="user-row-id" style="color:#15803d; font-family:inherit;">🛠 倉庫最後操作：${la ? `${auFmt(la)}（${auRel(la)}）${u.warehouseLastAction ? ' · ' + esc(u.warehouseLastAction) : ''}` : '尚無紀錄'}</div>`;
       }
