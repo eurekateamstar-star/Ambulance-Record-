@@ -443,6 +443,7 @@
       .u-cat-tag { font-size: 10px; font-weight: 700; color: #7c3aed; background: #f3e8ff; padding: 2px 6px; border-radius: 4px; margin-left: 4px; vertical-align: middle; white-space: nowrap; }
       .u-wh-tag { font-size: 10px; font-weight: 700; color: #b91c1c; background: #fee2e2; padding: 2px 6px; border-radius: 4px; margin-left: 4px; vertical-align: middle; white-space: nowrap; }
       .ub-cat { background: #7c3aed; }
+      .ub-line { background: #06c755; }
       .ucat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 10px 0 14px; max-height: 50vh; overflow-y: auto; }
       .ucat-btn { border: 1px solid #cbd5e1; background: #f8fafc; color: #1e293b; font-size: 14px; font-weight: 700; padding: 12px 6px; border-radius: 10px; cursor: pointer; word-break: break-all; }
       .ucat-btn:active { transform: scale(0.97); }
@@ -474,6 +475,10 @@
       <div class="modal-row">
         <label>身分證字號</label>
         <input type="text" id="regIdCard" class="modal-input" placeholder="請輸入身分證字號" style="text-transform: uppercase;">
+      </div>
+      <div class="modal-row">
+        <label>LINE ID（選填）</label>
+        <input type="text" id="regLineId" class="modal-input" placeholder="可被搜尋的 LINE ID，方便管理員聯絡" autocapitalize="off" autocomplete="off">
       </div>
       <button class="notice-btn" style="margin-top:20px;" onclick="window.submitRegistration()">送出審核</button>
     </div>
@@ -842,6 +847,10 @@
       <div class="modal-row">
         <label>身分證字號</label>
         <input type="text" id="editUserIdCard" class="modal-input" placeholder="請輸入身分證字號" style="text-transform: uppercase;">
+      </div>
+      <div class="modal-row">
+        <label>LINE ID（選填）</label>
+        <input type="text" id="editUserLineId" class="modal-input" placeholder="可被搜尋的 LINE ID" autocapitalize="off" autocomplete="off">
       </div>
       <div class="modal-btns">
         <button class="modal-btn btn-cancel" onclick="window.closeUserEdit()">取消</button>
@@ -1227,6 +1236,19 @@
       }, (e) => console.warn('帳號即時同步失敗:', e));
     }
 
+
+    // ===== 個人 LINE ID（選填，用來從名單打開對方的 LINE）=====
+    function normLineId(v) { return String(v || '').trim().replace(/^@/, '').replace(/^~/, '').toLowerCase(); }
+    function validLineId(v) { return !v || /^[a-z0-9._-]{4,20}$/.test(v); }
+    function lineChatUrl(id) { return `https://line.me/R/ti/p/~${encodeURIComponent(normLineId(id))}`; }
+    window.openLineChat = function (id) {
+      id = normLineId(id);
+      if (!id) return;
+      const url = lineChatUrl(id);
+      try { if (window.liff && liff.isInClient && liff.isInClient()) { liff.openWindow({ url, external: false }); return; } } catch (e) {}
+      window.open(url, '_blank');
+    };
+
     // 進入系統主畫面 (共用邏輯)
     let inSystem = false;
     async function enterSystem(userData, isOffline) {
@@ -1264,6 +1286,7 @@
       isResubmit = true;
       document.getElementById('regRealName').value = (currentUserData && currentUserData.realName) || '';
       document.getElementById('regIdCard').value = (currentUserData && currentUserData.idCard) || '';
+      document.getElementById('regLineId').value = (currentUserData && currentUserData.lineId) || '';
       document.getElementById('authRejected').style.display = 'none';
       document.getElementById('authRegister').style.display = 'block';
     };
@@ -1272,10 +1295,12 @@
     window.submitRegistration = async function() {
       const realName = document.getElementById('regRealName').value.trim();
       const idCard = document.getElementById('regIdCard').value.trim().toUpperCase();
+      const lineId = normLineId(document.getElementById('regLineId').value);
       const idCardRegex = /^[A-Z][1289]\d{8}$/; // 簡易身分證格式驗證
 
       if (!realName) { alert("請輸入真實姓名"); return; }
       if (!idCardRegex.test(idCard)) { alert("身分證字號格式不正確"); return; }
+      if (!validLineId(lineId)) { alert("LINE ID 格式不正確（4～20 個英數字、點、底線或減號）"); return; }
 
       document.getElementById('authRegister').style.display = 'none';
       document.getElementById('authLoading').style.display = 'block';
@@ -1290,6 +1315,7 @@
             pictureUrl: currentUserProfile.pictureUrl || '',
             realName: realName,
             idCard: idCard,
+            lineId: lineId,
             status: 'pending',
             rejectReason: '',
             resubmittedAt: serverTimestamp()
@@ -1306,6 +1332,7 @@
             pictureUrl: currentUserProfile.pictureUrl || '',
             realName: realName,
             idCard: idCard,
+            lineId: lineId,
             status: isFirstUser ? 'approved' : 'pending',
             role: isFirstUser ? 'admin' : 'user',
             createdAt: serverTimestamp()
@@ -3089,6 +3116,7 @@
       if (u.status !== 'banned') {
         actionBtns += `<button class="u-btn ub-ban" onclick="window.updateUserStatus('${u.id}', 'banned')">🚫 停權</button>`;
       }
+      if (u.lineId) actionBtns += `<button class="u-btn ub-line" onclick="window.openLineChat('${esc(u.lineId)}')">💬 LINE</button>`;
       actionBtns += `<button class="u-btn ub-cat" onclick="window.openUserCategory('${u.id}')">🏷️ 分類</button>`;
       actionBtns += `<button class="u-btn ub-edit" onclick="window.openUserEdit('${u.id}')">✏️ 編輯資料</button>`;
 
@@ -3107,7 +3135,7 @@
               <div class="user-row-name">
                 <div>${esc(u.realName)} ${roleTag}${catTag}${whTag}</div>
                 <div class="user-row-id">${esc(u.idCard)}</div>
-                <div class="user-row-id">LINE: ${esc(u.lineDisplayName || '未知')}</div>
+                <div class="user-row-id">LINE: ${esc(u.lineDisplayName || '未知')}${u.lineId ? ' · ID ' + esc(u.lineId) : ''}</div>
                 ${whLines}
               </div>
             </div>
@@ -3292,6 +3320,7 @@
       editingUserId = userId;
       document.getElementById('editUserRealName').value = u.realName || '';
       document.getElementById('editUserIdCard').value = u.idCard || '';
+      document.getElementById('editUserLineId').value = u.lineId || '';
       document.getElementById('userEditModal').style.display = 'flex';
     };
     window.closeUserEdit = function() {
@@ -3304,11 +3333,13 @@
       const idCard = document.getElementById('editUserIdCard').value.trim().toUpperCase();
       if (!realName) { window.showNotice('info', '請輸入姓名', '真實姓名不可空白'); return; }
       if (!/^[A-Z][1289]\d{8}$/.test(idCard)) { window.showNotice('info', '格式不正確', '身分證字號格式不正確'); return; }
+      const lineId = normLineId(document.getElementById('editUserLineId').value);
+      if (!validLineId(lineId)) { window.showNotice('info', '格式不正確', 'LINE ID 需為 4～20 個英數字、點、底線或減號'); return; }
 
       const uid = editingUserId;
       try {
         document.getElementById('loading').style.display = 'flex';
-        await updateDoc(doc(db, "users", uid), { realName: realName, idCard: idCard });
+        await updateDoc(doc(db, "users", uid), { realName: realName, idCard: idCard, lineId: lineId });
         document.getElementById('loading').style.display = 'none';
         window.closeUserEdit();
         window.showNotice('success', '儲存完成', '人員資料已更新');
