@@ -432,6 +432,22 @@
       .tab-item.done { color: #16a34a; }
       .tab-item.done .step-num { background: #16a34a; color: #fff; }
       .tab-item.done.active { color: #16a34a; }
+
+      /* ★ 人員：搜尋 / 分類 / 區塊（與倉庫管理相同形式） ★ */
+      .u-section-title { display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 800; margin: 14px 2px 8px; }
+      .u-section-title span:last-child { font-size: 11px; font-weight: 600; color: #94a3b8; }
+      .u-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 2px 2px; }
+      .u-chip { border: 1px solid #cbd5e1; background: #fff; color: #475569; font-size: 12px; font-weight: 700; padding: 5px 11px; border-radius: 14px; cursor: pointer; transition: 0.1s; }
+      .u-chip:active { transform: scale(0.95); }
+      .u-chip.on { background: var(--ssc-primary, #D65A68); border-color: var(--ssc-primary, #D65A68); color: #fff; }
+      .u-cat-tag { font-size: 10px; font-weight: 700; color: #7c3aed; background: #f3e8ff; padding: 2px 6px; border-radius: 4px; margin-left: 4px; vertical-align: middle; white-space: nowrap; }
+      .u-wh-tag { font-size: 10px; font-weight: 700; color: #b91c1c; background: #fee2e2; padding: 2px 6px; border-radius: 4px; margin-left: 4px; vertical-align: middle; white-space: nowrap; }
+      .ub-cat { background: #7c3aed; }
+      .ucat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 10px 0 14px; max-height: 50vh; overflow-y: auto; }
+      .ucat-btn { border: 1px solid #cbd5e1; background: #f8fafc; color: #1e293b; font-size: 14px; font-weight: 700; padding: 12px 6px; border-radius: 10px; cursor: pointer; word-break: break-all; }
+      .ucat-btn:active { transform: scale(0.97); }
+      .ucat-btn.on { background: #7c3aed; border-color: #7c3aed; color: #fff; }
+      .ucat-btn.new { background: #dcfce7; border-color: #86efac; color: #166534; }
     </style>
 
   </head>
@@ -834,6 +850,18 @@
     </div>
   </div>
 
+  <!-- ★ 人員分類選擇視窗 ★ -->
+  <div id="userCatModal" class="modal-overlay top-z">
+    <div class="modal-card">
+      <div class="modal-title">設定分類</div>
+      <div id="userCatName" style="font-size:12px; color:#64748b; text-align:center; margin-bottom:4px;"></div>
+      <div id="userCatGrid" class="ucat-grid"></div>
+      <div class="modal-btns">
+        <button class="modal-btn btn-cancel" onclick="window.closeUserCategory()">取消</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 自訂提示視窗 -->
   <div id="noticeOverlay" class="notice-overlay" onclick="if(event.target===this) window.closeNotice()">
     <div id="noticeCard" class="notice-card success">
@@ -951,6 +979,10 @@
       <!-- 分頁 4: 人員身分與權限審核 -->
       <div class="console-panel" id="panel-users">
         <div style="font-size:11px; padding:4px 8px; background:#e0f2fe; color:#0369a1; font-weight:bold; border-bottom:1px solid #bae6fd; margin-bottom:8px;">💡 審核通過的人員才能填寫表單；「退回」可填原因並讓對方重新輸入資料；「停權」則完全無法登入；「設為管理員」才可進入此主控台。</div>
+        <div class="console-filter-bar">
+          <input type="text" id="adminUserSearch" placeholder="搜尋姓名 / LINE 名稱 / 分類..." oninput="window.filterAdminUsers()">
+        </div>
+        <div id="adminUserCats" class="u-chips"></div>
         <div id="adminUserList" style="flex:1; overflow-y:auto;">載入中...</div>
       </div>
 
@@ -2898,88 +2930,211 @@
       }
     }
 
-    // 渲染人員清單 UI
+    // ===== 人員：搜尋 / 分類（與「白沙屯倉庫管理」共用 users 資料與分類欄位 category）=====
+    let adminUserQuery = '', adminUserCat = '__all';
+    const auCat = u => (('category' in u) ? (u.category || '') : (u.warehouseCategory || ''));
+    const auTs = t => (t && typeof t.toMillis === 'function') ? t.toMillis() : (Number(t) || 0);
+    function auFmt(ms) {
+      const d = new Date(ms);
+      return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    }
+    function auRel(ms) {
+      const m = Math.floor((Date.now() - ms) / 60000);
+      return m < 1 ? '剛剛' : m < 60 ? `${m} 分鐘前` : m < 1440 ? `${Math.floor(m / 60)} 小時前` : `${Math.floor(m / 1440)} 天前`;
+    }
+    window.filterAdminUsers = function() {
+      adminUserQuery = (document.getElementById('adminUserSearch').value || '').trim().toLowerCase();
+      if (adminUsersCache) renderAdminUsers(adminUsersCache);
+    };
+
+    function renderAdminUserChips(users) {
+      const el = document.getElementById('adminUserCats');
+      if (!el) return;
+      el.innerHTML = '';
+      const cats = new Map();
+      users.forEach(u => { const c = auCat(u); if (c) cats.set(c, (cats.get(c) || 0) + 1); });
+      if (adminUserCat !== '__all' && adminUserCat !== '__none' && !cats.has(adminUserCat)) adminUserCat = '__all';
+      const mk = (key, label, n) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'u-chip' + (adminUserCat === key ? ' on' : '');
+        b.textContent = `${label} ${n}`;
+        b.onclick = () => { adminUserCat = key; renderAdminUsers(adminUsersCache || users); };
+        el.appendChild(b);
+      };
+      mk('__all', '全部', users.length);
+      [...cats.entries()].sort((a, b) => a[0].localeCompare(b[0], 'zh-Hant')).forEach(([c, n]) => mk(c, '🏷️ ' + c, n));
+      const none = users.filter(u => !auCat(u)).length;
+      if (none && cats.size) mk('__none', '未分類', none);
+    }
+
+    function adminUserCardHtml(u) {
+      let statusTag = '';
+      if (u.status === 'approved') statusTag = '<span class="user-row-status status-approved">✅ 已核准</span>';
+      else if (u.status === 'rejected') statusTag = '<span class="user-row-status status-rejected">❌ 已退回</span>';
+      else if (u.status === 'banned') statusTag = '<span class="user-row-status status-banned">🚫 已停權</span>';
+      else statusTag = '<span class="user-row-status status-pending">⏳ 待審核</span>';
+
+      const roleTag = u.role === 'admin' ? '<span class="role-badge">⭐ 管理員</span>' : '';
+      const catTag = auCat(u) ? `<span class="u-cat-tag">🏷️ ${esc(auCat(u))}</span>` : '';
+      const whTag = u.warehouseRemoved ? '<span class="u-wh-tag">⛔ 已移出倉庫</span>' : '';
+
+      let reasonHtml = '';
+      if ((u.status === 'rejected' || u.status === 'banned') && u.rejectReason) {
+        reasonHtml = `<div class="user-row-reason">${u.status === 'banned' ? '停權' : '退回'}原因：${esc(u.rejectReason)}</div>`;
+      }
+
+      // LINE 頭貼（沒有或載入失敗時顯示姓名第一個字）
+      const initial = esc(String(u.realName || u.lineDisplayName || '?').trim().charAt(0) || '?');
+      const avatarHtml = `<div class="u-avatar"><span>${initial}</span>${u.pictureUrl ? `<img src="${esc(u.pictureUrl)}/large" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}</div>`;
+
+      // 倉庫的登入 / 操作時間（唯讀）
+      let whLines = '';
+      if (u.status === 'approved') {
+        const li = auTs(u.warehouseLastLoginAt), la = auTs(u.warehouseLastActionAt);
+        whLines = `
+          <div class="user-row-id" style="color:#b45309; font-family:inherit;">🕒 倉庫上次登入：${li ? `${auFmt(li)}（${auRel(li)}）` : '尚無紀錄'}</div>
+          <div class="user-row-id" style="color:#15803d; font-family:inherit;">🛠 倉庫最後操作：${la ? `${auFmt(la)}（${auRel(la)}）${u.warehouseLastAction ? ' · ' + esc(u.warehouseLastAction) : ''}` : '尚無紀錄'}</div>`;
+      }
+
+      let actionBtns = '';
+      if (u.status !== 'approved') {
+        actionBtns += `<button class="u-btn ub-ok" onclick="window.updateUserStatus('${u.id}', 'approved')">${u.status === 'banned' ? '解除停權' : '核准登入'}</button>`;
+      }
+      if (u.status === 'pending' || u.status === 'approved') {
+        actionBtns += `<button class="u-btn ub-no" onclick="window.updateUserStatus('${u.id}', 'rejected')">退回</button>`;
+      }
+      if (u.status !== 'banned') {
+        actionBtns += `<button class="u-btn ub-ban" onclick="window.updateUserStatus('${u.id}', 'banned')">🚫 停權</button>`;
+      }
+      actionBtns += `<button class="u-btn ub-cat" onclick="window.openUserCategory('${u.id}')">🏷️ 分類</button>`;
+      actionBtns += `<button class="u-btn ub-edit" onclick="window.openUserEdit('${u.id}')">✏️ 編輯資料</button>`;
+
+      let roleBtns = '';
+      if (u.status === 'approved') {
+        roleBtns = u.role === 'admin'
+          ? `<button class="u-btn ub-user" onclick="window.updateUserRole('${u.id}', 'user')">降為一般人員</button>`
+          : `<button class="u-btn ub-admin" onclick="window.updateUserRole('${u.id}', 'admin')">設為管理員</button>`;
+      }
+
+      return `
+        <div class="user-row">
+          <div class="user-row-header">
+            <div style="display:flex; gap:10px; align-items:flex-start; min-width:0;">
+              ${avatarHtml}
+              <div class="user-row-name">
+                <div>${esc(u.realName)} ${roleTag}${catTag}${whTag}</div>
+                <div class="user-row-id">${esc(u.idCard)}</div>
+                <div class="user-row-id">LINE: ${esc(u.lineDisplayName || '未知')}</div>
+                ${whLines}
+              </div>
+            </div>
+            <div>${statusTag}</div>
+          </div>
+          ${reasonHtml}
+          <div class="user-row-actions">
+            ${actionBtns}
+            ${roleBtns}
+          </div>
+        </div>`;
+    }
+
+    // 渲染人員清單 UI（依狀態分區；可搜尋、可依分類篩選）
     function renderAdminUsers(users) {
       const listDiv = document.getElementById('adminUserList');
       adminUsersMap = {};
       users.forEach(u => { adminUsersMap[u.id] = u; });
+      renderAdminUserChips(users);
 
       if (users.length === 0) {
         listDiv.innerHTML = '<div style="text-align:center; padding: 20px; color:#888;">尚無任何人員資料</div>';
         return;
       }
 
-      let html = '';
-      users.forEach(u => {
-        let statusTag = '';
-        if (u.status === 'pending') statusTag = '<span class="user-row-status status-pending">⏳ 待審核</span>';
-        else if (u.status === 'approved') statusTag = '<span class="user-row-status status-approved">✅ 已核准</span>';
-        else if (u.status === 'rejected') statusTag = '<span class="user-row-status status-rejected">❌ 已退回</span>';
-        else if (u.status === 'banned') statusTag = '<span class="user-row-status status-banned">🚫 已停權</span>';
-        
-        let roleTag = u.role === 'admin' ? '<span class="role-badge">⭐ 管理員</span>' : '';
+      const matches = u => {
+        const c = auCat(u);
+        if (adminUserCat === '__none' && c) return false;
+        if (adminUserCat !== '__all' && adminUserCat !== '__none' && c !== adminUserCat) return false;
+        if (adminUserQuery) {
+          const hay = `${u.realName || ''} ${u.lineDisplayName || ''} ${c}`.toLowerCase();
+          if (!hay.includes(adminUserQuery)) return false;
+        }
+        return true;
+      };
+      const byCatName = (a, b) => (auCat(a) || '\uffff').localeCompare(auCat(b) || '\uffff', 'zh-Hant') || String(a.realName || '').localeCompare(String(b.realName || ''), 'zh-Hant');
+      const list = users.filter(matches).sort(byCatName);
 
-        // 退回 / 停權原因
-        let reasonHtml = '';
-        if ((u.status === 'rejected' || u.status === 'banned') && u.rejectReason) {
-          reasonHtml = `<div class="user-row-reason">${u.status === 'banned' ? '停權' : '退回'}原因：${esc(u.rejectReason)}</div>`;
-        }
+      const pend = list.filter(u => u.status !== 'approved' && u.status !== 'rejected' && u.status !== 'banned');
+      const admins = list.filter(u => u.status === 'approved' && u.role === 'admin');
+      const members = list.filter(u => u.status === 'approved' && u.role !== 'admin');
+      const rejected = list.filter(u => u.status === 'rejected');
+      const banned = list.filter(u => u.status === 'banned');
 
-        // LINE 頭貼（沒有或載入失敗時顯示姓名第一個字）
-        const initial = esc(String(u.realName || u.lineDisplayName || '?').trim().charAt(0) || '?');
-        const avatarHtml = `<div class="u-avatar"><span>${initial}</span>${u.pictureUrl ? `<img src="${esc(u.pictureUrl)}/large" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}</div>`;
+      const section = (title, color, arr) => arr.length
+        ? `<div class="u-section-title" style="color:${color};"><span>${title}</span><span>${arr.length} 人</span></div>` + arr.map(adminUserCardHtml).join('') : '';
 
-        // 操作按鈕
-        let actionBtns = '';
-        if (u.status !== 'approved') {
-          actionBtns += `<button class="u-btn ub-ok" onclick="window.updateUserStatus('${u.id}', 'approved')">${u.status === 'banned' ? '解除停權' : '核准登入'}</button>`;
-        }
-        if (u.status === 'pending' || u.status === 'approved') {
-          actionBtns += `<button class="u-btn ub-no" onclick="window.updateUserStatus('${u.id}', 'rejected')">退回</button>`;
-        }
-        if (u.status !== 'banned') {
-          actionBtns += `<button class="u-btn ub-ban" onclick="window.updateUserStatus('${u.id}', 'banned')">🚫 停權</button>`;
-        }
-        actionBtns += `<button class="u-btn ub-edit" onclick="window.openUserEdit('${u.id}')">✏️ 編輯資料</button>`;
-        
-        let roleBtns = '';
-        if (u.role === 'admin') {
-          roleBtns = `<button class="u-btn ub-user" onclick="window.updateUserRole('${u.id}', 'user')">降為一般人員</button>`;
-        } else {
-          roleBtns = `<button class="u-btn ub-admin" onclick="window.updateUserRole('${u.id}', 'admin')">設為管理員</button>`;
-        }
+      const html = section('⏳ 待審核', '#ca8a04', pend)
+        + section('👑 管理員', '#7c3aed', admins)
+        + section('👤 一般人員', '#475569', members)
+        + section('❌ 已退回', '#dc2626', rejected)
+        + section('🚫 已停權', '#1f2937', banned);
 
-        html += `
-          <div class="user-row">
-            <div class="user-row-header">
-              <div style="display:flex; gap:10px; align-items:flex-start; min-width:0;">
-                ${avatarHtml}
-                <div class="user-row-name">
-                  <div>${esc(u.realName)} ${roleTag}</div>
-                  <div class="user-row-id">${esc(u.idCard)}</div>
-                  <div class="user-row-id">LINE: ${esc(u.lineDisplayName || '未知')}</div>
-                </div>
-              </div>
-              <div>${statusTag}</div>
-            </div>
-            ${reasonHtml}
-            <div class="user-row-actions">
-              ${actionBtns}
-              ${u.status === 'approved' ? roleBtns : ''}
-            </div>
-          </div>
-        `;
-      });
-      listDiv.innerHTML = html;
+      listDiv.innerHTML = html || '<div style="text-align:center; padding: 20px; color:#888;">沒有符合的人員</div>';
     }
+
+    // ===== 人員分類設定 =====
+    window.openUserCategory = function(userId) {
+      const u = adminUsersMap[userId];
+      if (!u) return;
+      document.getElementById('userCatName').textContent = `「${u.realName || ''}」目前：${auCat(u) || '未分類'}`;
+      const grid = document.getElementById('userCatGrid');
+      grid.innerHTML = '';
+      const add = (label, cls, fn) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'ucat-btn ' + cls;
+        b.textContent = label;
+        b.onclick = fn;
+        grid.appendChild(b);
+      };
+      const cats = new Set();
+      (adminUsersCache || []).forEach(x => { const c = auCat(x); if (c) cats.add(c); });
+      [...cats].sort((a, b) => a.localeCompare(b, 'zh-Hant')).forEach(c => add(c, auCat(u) === c ? 'on' : '', () => window.setUserCategory(userId, c)));
+      add('＋ 新增分類', 'new', async () => {
+        window.closeUserCategory();
+        const n = await askReason('新增分類', '例如：A 隊、護理組、志工', true, ['請輸入分類名稱', '分類名稱不可空白。']);
+        if (n) window.setUserCategory(userId, n);
+      });
+      add('未分類', '', () => window.setUserCategory(userId, ''));
+      document.getElementById('userCatModal').style.display = 'flex';
+    };
+    window.closeUserCategory = function() {
+      document.getElementById('userCatModal').style.display = 'none';
+    };
+    window.setUserCategory = async function(userId, name) {
+      window.closeUserCategory();
+      try {
+        document.getElementById('loading').style.display = 'flex';
+        // category 為共用欄位；warehouseCategory 一併寫入，確保舊版倉庫管理也讀得到
+        await updateDoc(doc(db, "users", userId), { category: name, warehouseCategory: name });
+        document.getElementById('loading').style.display = 'none';
+        window.showNotice('success', '設定成功', name ? `已分類：${name}` : '已改為未分類');
+        loadAdminUsers();
+      } catch (e) {
+        document.getElementById('loading').style.display = 'none';
+        window.showNotice('error', '設定失敗', e.message);
+      }
+    };
 
     // ★ 退回 / 停權原因輸入（回傳 Promise：字串 = 確認，null = 取消）
     let reasonResolver = null;
     let reasonRequired = false;
-    function askReason(title, placeholder, required) {
+    let reasonEmptyMsg = null;
+    function askReason(title, placeholder, required, emptyMsg) {
       return new Promise(resolve => {
         reasonResolver = resolve;
         reasonRequired = !!required;
+        reasonEmptyMsg = emptyMsg || null;
         document.getElementById('reasonModalTitle').innerText = title;
         document.getElementById('reasonModalInput').placeholder = placeholder || '請輸入原因';
         document.getElementById('reasonModalInput').value = '';
@@ -2990,7 +3145,7 @@
     window.resolveReasonModal = function(ok) {
       if (ok === true) {
         const val = document.getElementById('reasonModalInput').value.trim();
-        if (reasonRequired && !val) { window.showNotice('info', '請輸入原因', '退回時請填寫原因，對方才知道要修正什麼。'); return; }
+        if (reasonRequired && !val) { const m = reasonEmptyMsg || ['請輸入原因', '退回時請填寫原因，對方才知道要修正什麼。']; window.showNotice('info', m[0], m[1]); return; }
         document.getElementById('reasonModal').style.display = 'none';
         if (reasonResolver) { const r = reasonResolver; reasonResolver = null; r(val); }
       } else {
