@@ -1021,6 +1021,7 @@
     import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js";
     import { initializeFirestore, persistentLocalCache, collection, addDoc, getDocs, doc, getDoc, setDoc, deleteDoc, updateDoc, query, orderBy, limit, serverTimestamp, onSnapshot } 
     from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getAuth, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyA_5hmnIBCeLszWW8kIjgOZelv-c6-ALfY",
@@ -1036,6 +1037,31 @@
     const app = initializeApp(firebaseConfig);
     const analytics = getAnalytics(app);
     const db = initializeFirestore(app, { localCache: persistentLocalCache() });
+
+    // ===== Firebase 身分驗證：LINE → 驗證伺服器（Cloudflare）→ Firebase，資料庫規則靠這個認人 =====
+    const AUTH_URL = '';   // Cloudflare Worker 網址
+    const auth = getAuth(app);
+    async function fbSignIn(uid) {
+      try {
+        await new Promise(res => { const off = onAuthStateChanged(auth, () => { off(); res(); }); });
+        if (auth.currentUser && auth.currentUser.uid === uid) return true;
+        if (!AUTH_URL) return false;
+        const at = liff.getAccessToken();
+        if (!at) return false;
+        const r = await fetch(AUTH_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ accessToken: at }) });
+        const j = await r.json().catch(() => ({}));
+        if (r.status === 401) {   // LINE 憑證過期 → 重新登入一次
+          let tried = false;
+          try { tried = sessionStorage.getItem('fbRelogin') === '1'; sessionStorage.setItem('fbRelogin', '1'); } catch (e) {}
+          if (!tried) { try { liff.logout(); } catch (e) {} liff.login({ redirectUri: location.origin + location.pathname }); return new Promise(() => {}); }
+        }
+        if (!j.token) throw new Error(j.error || 'auth failed');
+        await signInWithCustomToken(auth, j.token);
+        try { sessionStorage.removeItem('fbRelogin'); } catch (e) {}
+        return true;
+      } catch (e) { console.warn('Firebase 登入失敗', e); return false; }
+    }
+
 
     const steps = ['basic', 'scene', 'treatment', 'vitals'];
     let currentStep = 0;
@@ -1119,6 +1145,7 @@
         }
 
         currentUserProfile = await liff.getProfile();
+        await fbSignIn(currentUserProfile.userId);
         await checkUserAuth(currentUserProfile);
         watchOwnUser(currentUserProfile);
 
@@ -1365,8 +1392,7 @@
           isResubmit = false;
         } else {
           const usersQuery = query(collection(db, "users"), limit(1));
-          const usersSnap = await getDocs(usersQuery);
-          const isFirstUser = usersSnap.empty; 
+          const isFirstUser = await getDocs(usersQuery).then(s => s.empty, () => false); 
 
           await setDoc(userRef, {
             lineUserId: currentUserProfile.userId,
