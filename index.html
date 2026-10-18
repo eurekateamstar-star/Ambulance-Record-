@@ -510,6 +510,10 @@
         <label>身分證字號</label>
         <input type="text" id="regIdCard" class="modal-input" placeholder="請輸入身分證字號" style="text-transform: uppercase;">
       </div>
+      <div class="modal-row">
+        <label>出生日期</label>
+        <input type="date" id="regBirthday" class="modal-input" max="2030-12-31">
+      </div>
       <div class="modal-row" style="flex-direction:column; align-items:stretch;">
         <label>證照類別</label>
         <div class="cert-group" id="regCertGroup"><button type="button" class="cert-btn" data-cert="EMT-1" onclick="window.pickCert('EMT-1')">EMT-1</button><button type="button" class="cert-btn" data-cert="EMT-2" onclick="window.pickCert('EMT-2')">EMT-2</button><button type="button" class="cert-btn" data-cert="EMT-P" onclick="window.pickCert('EMT-P')">EMT-P</button><button type="button" class="cert-btn" data-cert="護理師" onclick="window.pickCert('護理師')">護理師</button><button type="button" class="cert-btn" data-cert="醫師" onclick="window.pickCert('醫師')">醫師</button><button type="button" class="cert-btn" data-cert="無證照" onclick="window.pickCert('無證照')">無證照</button></div>
@@ -521,8 +525,9 @@
     <div class="auth-card" id="authPending">
       <div class="notice-icon" style="background:#fff3cd; color:#856404; font-size:24px; width:60px; height:60px; margin: 0 auto 15px auto;">⏳</div>
       <h3>等待審核中</h3>
-      <p style="color:#666; font-size:14px;">您的資料已送出，請等候管理員核對身分並開通系統權限。</p>
+      <p style="color:#666; font-size:14px;">您輸入的資料與團員名冊沒有完全相符，已送管理員人工審核，核准後會自動開通。</p>
       <p style="font-size:12px; color:#999; margin-top:15px;">(若久未開通，請於群組提醒管理員)</p>
+      <button class="notice-btn" style="margin-top:14px; background:#94a3b8;" onclick="window.startResubmit()">資料填錯了？重新填寫</button>
     </div>
 
     <!-- 審核被退回（可重新輸入） -->
@@ -1285,6 +1290,8 @@
       isResubmit = true;
       document.getElementById('regRealName').value = (currentUserData && currentUserData.realName) || '';
       document.getElementById('regIdCard').value = (currentUserData && currentUserData.idCard) || '';
+      document.getElementById('regBirthday').value = (currentUserData && currentUserData.birthday) || '';
+      document.getElementById('authPending').style.display = 'none';
       window.pickCert((currentUserData && (currentUserData.certification || currentUserData.category)) || '');
       document.getElementById('authRejected').style.display = 'none';
       document.getElementById('authRegister').style.display = 'block';
@@ -1298,6 +1305,27 @@
       document.querySelectorAll('#regCertGroup .cert-btn').forEach(x => x.classList.toggle('on', x.dataset.cert === regCert));
     };
 
+
+    // ===== 團員名冊比對（與「會員中心」相同規則）=====
+    // 名冊文件 ID = SHA-256(身分證|生日)；姓名也要相符、且尚未被別的 LINE 綁定，才算驗證通過
+    const ROSTER = 'member_roster';
+    const _normId = s => String(s || '').replace(/\s+/g, '').toUpperCase();
+    const _normName = s => String(s || '').replace(/[\s　]+/g, '');
+    async function rosterKey(idCard, bday) {
+      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${_normId(idCard)}|${bday || ''}`));
+      return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+    async function matchRoster(realName, idCard, birthday, uid) {
+      try {
+        const s = await getDoc(doc(db, ROSTER, await rosterKey(idCard, birthday)));
+        if (!s.exists()) return null;
+        const r = { id: s.id, ...s.data() };
+        if (_normName(r.name) !== _normName(realName)) return null;
+        if (r.boundUserId && r.boundUserId !== uid) return null;
+        return r;
+      } catch (e) { return null; }
+    }
+
     window.submitRegistration = async function() {
       const realName = document.getElementById('regRealName').value.trim();
       const idCard = document.getElementById('regIdCard').value.trim().toUpperCase();
@@ -1305,6 +1333,8 @@
 
       if (!realName) { alert("請輸入真實姓名"); return; }
       if (!idCardRegex.test(idCard)) { alert("身分證字號格式不正確"); return; }
+      const birthday = document.getElementById('regBirthday').value;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(birthday)) { alert("請選擇出生日期"); return; }
       if (!regCert) { alert("請選擇證照類別"); return; }
 
       document.getElementById('authRegister').style.display = 'none';
@@ -1312,6 +1342,9 @@
 
       try {
         const userRef = doc(db, "users", currentUserProfile.userId);
+        const roster = await matchRoster(realName, idCard, birthday, currentUserProfile.userId);   // ★ 與團員名冊比對
+        const verified = roster ? { verifiedBy: 'roster', rosterId: roster.id, approvedAt: serverTimestamp() } : {};
+        if (!isResubmit && (await getDoc(userRef)).exists()) isResubmit = true;   // 已有資料（例如待審核中改資料）→ 用更新
 
         if (isResubmit) {
           // ★ 被退回後重新送審：只更新資料，狀態回到待審核，清除退回原因
@@ -1320,12 +1353,14 @@
             pictureUrl: currentUserProfile.pictureUrl || '',
             realName: realName,
             idCard: idCard,
+            birthday: birthday,
             certification: regCert,
             category: regCert,
             warehouseCategory: regCert,
-            status: 'pending',
+            status: roster ? 'approved' : 'pending',
             rejectReason: '',
-            resubmittedAt: serverTimestamp()
+            resubmittedAt: serverTimestamp(),
+            ...verified
           });
           isResubmit = false;
         } else {
@@ -1339,14 +1374,17 @@
             pictureUrl: currentUserProfile.pictureUrl || '',
             realName: realName,
             idCard: idCard,
+            birthday: birthday,
             certification: regCert,
             category: regCert,
             warehouseCategory: regCert,
-            status: isFirstUser ? 'approved' : 'pending',
+            status: (isFirstUser || roster) ? 'approved' : 'pending',
             role: isFirstUser ? 'admin' : 'user',
-            createdAt: serverTimestamp()
+            createdAt: serverTimestamp(),
+            ...verified
           });
         }
+        if (roster) await updateDoc(doc(db, ROSTER, roster.id), { boundUserId: currentUserProfile.userId, boundAt: serverTimestamp() }).catch(() => {});
 
         await checkUserAuth(currentUserProfile);
 
