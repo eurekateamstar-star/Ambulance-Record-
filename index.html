@@ -1041,10 +1041,11 @@
     // ===== Firebase 身分驗證：LINE → 驗證伺服器（Cloudflare）→ Firebase，資料庫規則靠這個認人 =====
     const AUTH_URL = 'https://bst-auth.eurekateamstar.workers.dev';   // Cloudflare Worker 網址
     const auth = getAuth(app);
+    const liffUid = () => { try { const t = liff.getDecodedIDToken(); return (t && t.sub) || null; } catch (e) { return null; } };
     async function fbSignIn(uid) {
       try {
         await new Promise(res => { const off = onAuthStateChanged(auth, () => { off(); res(); }); });
-        if (auth.currentUser && auth.currentUser.uid === uid) return true;
+        if (auth.currentUser && (!uid || auth.currentUser.uid === uid)) return true;
         if (!AUTH_URL) return false;
         const at = liff.getAccessToken();
         if (!at) return false;
@@ -1144,8 +1145,10 @@
           return;
         }
 
+        const fbP = fbSignIn(liffUid());
         currentUserProfile = await liff.getProfile();
-        await fbSignIn(currentUserProfile.userId);
+        await fbP;
+        if (!auth.currentUser || auth.currentUser.uid !== currentUserProfile.userId) await fbSignIn(currentUserProfile.userId);
         await checkUserAuth(currentUserProfile);
         watchOwnUser(currentUserProfile);
 
